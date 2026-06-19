@@ -1,0 +1,870 @@
+<meta charset="utf-8" />
+<title>Sektör Masası</title>
+<style>
+  :root{
+    --ground:#0E1318;
+    --surface:#161D26;
+    --surface-2:#1B232E;
+    --text:#E8E2D5;
+    --muted:#8B93A0;
+    --faint:#5A626E;
+    --accent:#E9A53C;
+    --accent-2:#6FA2CE;
+    --line:rgba(233,165,60,.14);
+    --line-cool:rgba(111,162,206,.16);
+    --good:#7FB069;
+    --bad:#D2654E;
+    --mono:ui-monospace,"Cascadia Code","Cascadia Mono","Consolas","SFMono-Regular",monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(900px 500px at 88% -10%,rgba(111,162,206,.06),transparent 60%),
+      radial-gradient(800px 600px at 0% 0%,rgba(233,165,60,.05),transparent 55%),
+      var(--ground);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  ::selection{background:rgba(233,165,60,.28)}
+  button{font-family:inherit;cursor:pointer}
+  input,textarea,select{font-family:inherit}
+
+  /* ---------- header ---------- */
+  header.bar{
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    padding:16px 24px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(27,35,46,.6),rgba(14,19,24,.2));
+    position:sticky;top:0;z-index:30;
+    backdrop-filter:blur(8px);
+  }
+  .brand{display:flex;align-items:baseline;gap:12px;margin-right:auto}
+  .glyph{
+    font-family:var(--mono);color:var(--accent);font-size:20px;letter-spacing:-1px;
+    text-shadow:0 0 14px rgba(233,165,60,.45);
+  }
+  .brand h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.14em;text-transform:uppercase}
+  .brand .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .search{
+    display:flex;align-items:center;gap:7px;background:var(--surface);
+    border:1px solid var(--line-cool);border-radius:7px;padding:7px 10px;
+  }
+  .search input{background:none;border:none;color:var(--text);outline:none;width:140px;font-size:13px}
+  .search input::placeholder{color:var(--faint)}
+  .search span{color:var(--faint);font-family:var(--mono);font-size:12px}
+  .btn{
+    background:var(--surface);color:var(--text);border:1px solid var(--line-cool);
+    border-radius:7px;padding:8px 12px;font-size:12.5px;font-weight:550;
+    display:inline-flex;align-items:center;gap:6px;transition:border-color .15s,background .15s,color .15s;
+  }
+  .btn:hover{border-color:var(--accent-2);background:var(--surface-2)}
+  .btn.primary{border-color:var(--line);color:var(--accent)}
+  .btn.primary:hover{background:rgba(233,165,60,.1);border-color:var(--accent)}
+  .btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--text);background:var(--surface)}
+  .btn.sm{padding:6px 9px;font-size:11.5px}
+
+  /* ---------- data-source bar ---------- */
+  .srcbar{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:9px 24px;border-bottom:1px solid var(--line-cool);
+    background:rgba(27,35,46,.35);font-size:12.5px;
+  }
+  .status{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px}
+  .sdot{width:9px;height:9px;border-radius:50%;flex:none}
+  .sdot.on{background:var(--good);box-shadow:0 0 8px rgba(127,176,105,.7)}
+  .sdot.warn{background:var(--accent);box-shadow:0 0 8px rgba(233,165,60,.6)}
+  .sdot.off{background:var(--faint)}
+  .status .path{color:var(--muted);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .status .path b{color:var(--text)}
+  .srcbar .spacer{margin-left:auto}
+  .srcbar .hint{color:var(--faint)}
+
+  /* ---------- ticker tape ---------- */
+  .tape{overflow:hidden;border-bottom:1px solid var(--line);
+    background:linear-gradient(90deg,rgba(14,19,24,.9),rgba(27,35,46,.5),rgba(14,19,24,.9));position:relative}
+  .tape::before,.tape::after{content:"";position:absolute;top:0;bottom:0;width:60px;z-index:2;pointer-events:none}
+  .tape::before{left:0;background:linear-gradient(90deg,var(--ground),transparent)}
+  .tape::after{right:0;background:linear-gradient(270deg,var(--ground),transparent)}
+  .tape-track{display:inline-flex;gap:34px;padding:9px 0;white-space:nowrap;
+    animation:scroll 60s linear infinite;font-family:var(--mono);font-size:12.5px}
+  .tape:hover .tape-track{animation-play-state:paused}
+  .tape-item{color:var(--muted)}
+  .tape-item b{color:var(--accent);font-weight:600;letter-spacing:.02em}
+  .tape-item .nm{color:var(--faint)}
+  @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media (prefers-reduced-motion:reduce){.tape-track{animation:none}}
+
+  /* ---------- stats strip ---------- */
+  .stats{display:flex;gap:0;flex-wrap:wrap;padding:0 24px;border-bottom:1px solid var(--line)}
+  .stat{padding:14px 26px 14px 0;margin-right:26px;border-right:1px solid var(--line-cool);
+    display:flex;flex-direction:column;gap:2px}
+  .stat:last-child{border-right:none}
+  .stat .n{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--text);line-height:1}
+  .stat .n.amber{color:var(--accent)}
+  .stat .l{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+
+  /* ---------- sector filter ---------- */
+  .filterbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:13px 24px;border-bottom:1px solid var(--line)}
+  .flabel{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-right:4px}
+  .fchip{background:var(--surface);border:1px solid var(--line-cool);border-radius:7px;
+    padding:6px 11px;font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:7px;
+    transition:border-color .14s,color .14s,background .14s}
+  .fchip:hover{color:var(--text);border-color:var(--accent-2)}
+  .fchip.on{color:var(--accent);border-color:var(--accent);background:rgba(233,165,60,.08)}
+  .fchip .fc{font-family:var(--mono);font-size:10px;color:var(--faint);background:rgba(255,255,255,.05);
+    border-radius:4px;padding:0 5px;line-height:16px}
+  .fchip.on .fc{color:var(--accent)}
+
+  /* ---------- grid ---------- */
+  main{padding:26px 24px 60px;max-width:1500px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px}
+  .card{background:linear-gradient(180deg,var(--surface-2),var(--surface));
+    border:1px solid var(--line-cool);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .card-head{padding:16px 16px 12px;border-bottom:1px solid var(--line-cool)}
+  .card-top{display:flex;align-items:flex-start;gap:10px}
+  .idx{font-family:var(--mono);font-size:11px;color:var(--accent);border:1px solid var(--line);
+    border-radius:5px;padding:2px 6px;line-height:1;margin-top:3px;flex:none}
+  .card h2{font-size:15.5px;margin:0;font-weight:620;flex:1;letter-spacing:.01em}
+  .card-actions{display:flex;gap:2px;flex:none}
+  .iconbtn{background:none;border:none;color:var(--faint);font-family:var(--mono);font-size:13px;
+    padding:3px 6px;border-radius:5px;line-height:1}
+  .iconbtn:hover{color:var(--text);background:rgba(255,255,255,.05)}
+  .iconbtn.del:hover{color:var(--bad)}
+  .thesis{font-size:12.5px;color:var(--muted);margin:9px 0 0;line-height:1.5}
+  .card-body{padding:12px 16px 6px;flex:1}
+  .empty-note{font-size:12px;color:var(--faint);font-style:italic;padding:6px 0 12px}
+  .co{padding:11px 0;border-top:1px solid rgba(255,255,255,.04)}
+  .co::after{content:"";display:block;clear:both}
+  .co:first-child{border-top:none}
+  .co .tkr{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent-2);letter-spacing:.02em}
+  .co .meta{min-width:0}
+  .co .nm{font-size:13px;font-weight:550;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .co .note{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.45;white-space:pre-wrap}
+  .size-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--faint);border:1px solid var(--line-cool);border-radius:4px;padding:1px 5px}
+  .conv{display:inline-flex;gap:3px;align-items:center}
+  .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.13)}
+  .dot.on{background:var(--accent);box-shadow:0 0 6px rgba(233,165,60,.5)}
+  .co-right{float:right;margin-left:12px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .co-tools{display:flex;gap:1px}
+  .co-id{float:left;width:150px;margin-right:16px;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+  .px{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+  .chg{font-weight:600}
+  .chg.up{color:var(--good)}
+  .chg.down{color:var(--bad)}
+  .mc-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;color:var(--accent-2);
+    border:1px solid var(--line-cool);border-radius:4px;padding:1px 5px}
+  .pxstat{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .pxstat b{color:var(--text)}
+  .srcsep{width:1px;height:18px;background:var(--line-cool);display:inline-block;margin:0 4px}
+  .metrics{display:flex;flex-direction:column;gap:3px;margin-top:5px;width:100%}
+  .m{font-family:var(--mono);font-size:10.5px;color:var(--faint);white-space:nowrap}
+  .m b{color:var(--text);font-weight:600}
+  .m b.up{color:var(--good)}
+  .m b.down{color:var(--bad)}
+  .tkr.live{cursor:pointer}
+  .tkr.live:hover{text-decoration:underline}
+  .spark{display:block;margin-top:6px;border-radius:4px;cursor:pointer}
+  .co.cofx{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+  .cofx-fin{flex:none;width:165px;display:flex;flex-direction:column;gap:5px}
+  .cofx-id{display:flex;flex-direction:column;gap:2px}
+  .cofx-cv{display:flex;align-items:center;gap:9px;margin-top:3px}
+  .cofx-text{flex:1;min-width:200px}
+  .cofx-name{font-size:13px;font-weight:550;margin-bottom:5px}
+  .cochart-wrap{flex:none;width:280px}
+  .irange{display:flex;gap:3px;margin-bottom:6px;background:var(--ground);
+    border:1px solid var(--line-cool);border-radius:7px;padding:3px}
+  .ir{flex:1;background:none;border:none;color:var(--muted);border-radius:5px;
+    padding:4px 0;font-family:var(--mono);font-size:10.5px;cursor:pointer}
+  .ir:hover{color:var(--text)}
+  .ir.on{background:rgba(233,165,60,.12);color:var(--accent)}
+  .cochart{display:block;width:280px;height:200px;background:rgba(0,0,0,.18);
+    border:1px solid var(--line-cool);border-radius:10px;cursor:pointer}
+  .cochart.noh{display:flex;align-items:center;justify-content:center;color:var(--faint);
+    font-size:11px;cursor:default;height:200px}
+  .sec-stats{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;
+    display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line-cool);border-radius:6px;padding:3px 9px}
+  .sec-stats b{color:var(--accent);font-weight:600}
+  .sec-stats .dim{color:var(--faint)}
+  /* chart modal */
+  .modal[hidden]{display:none}
+  .modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center}
+  .modal-bg{position:absolute;inset:0;background:rgba(6,9,12,.72);backdrop-filter:blur(2px)}
+  .modal-card{position:relative;background:linear-gradient(180deg,var(--surface-2),var(--surface));
+    border:1px solid var(--line);border-radius:14px;padding:18px;width:min(560px,92vw);
+    box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .modal-x{position:absolute;top:11px;right:13px;background:none;border:none;color:var(--faint);
+    font-family:var(--mono);font-size:15px;line-height:1}
+  .modal-x:hover{color:var(--text)}
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin:0 24px 12px 0}
+  .mh-t b{font-family:var(--mono);font-size:18px;color:var(--accent-2);letter-spacing:.02em}
+  .mh-n{color:var(--muted);font-size:13px}
+  .mh-px{font-family:var(--mono);font-size:16px;white-space:nowrap}
+  .modal-range{display:flex;gap:6px;margin-bottom:11px}
+  .rbtn{background:var(--surface);border:1px solid var(--line-cool);color:var(--muted);border-radius:6px;
+    padding:4px 13px;font-family:var(--mono);font-size:12px}
+  .rbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(233,165,60,.08)}
+  #chartCanvas{width:100%;height:auto;display:block;background:rgba(0,0,0,.18);
+    border:1px solid var(--line-cool);border-radius:8px}
+  .modal-foot{display:flex;flex-wrap:wrap;gap:5px 16px;margin-top:12px;font-family:var(--mono);
+    font-size:12px;color:var(--muted)}
+  .modal-foot b{color:var(--text)}
+  .mf.up{color:var(--good)}
+  .mf.down{color:var(--bad)}
+  .mf.dim{color:var(--faint)}
+  .sugg{padding:11px 16px 16px;border-top:1px solid var(--line-cool)}
+  .sugg .lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{background:rgba(111,162,206,.08);border:1px solid var(--line-cool);border-radius:20px;
+    padding:4px 10px;font-family:var(--mono);font-size:11.5px;color:var(--text);
+    display:inline-flex;align-items:center;gap:5px;transition:.14s}
+  .chip:hover{border-color:var(--accent-2);background:rgba(111,162,206,.16)}
+  .chip .plus{color:var(--accent);font-weight:700}
+  .chip.added{opacity:.4;text-decoration:line-through;pointer-events:none}
+  .addco{width:100%;background:none;border:1px dashed var(--line);color:var(--muted);
+    border-radius:8px;padding:9px;font-size:12.5px;margin-top:8px;transition:.14s}
+  .addco:hover{color:var(--accent);border-color:var(--accent)}
+  .form{padding:12px;background:var(--ground);border:1px solid var(--line);border-radius:8px;margin:10px 0}
+  .form .row{display:flex;gap:8px;margin-bottom:8px}
+  .form label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:3px}
+  .form input,.form textarea,.form select{width:100%;background:var(--surface);border:1px solid var(--line-cool);
+    color:var(--text);border-radius:6px;padding:7px 9px;font-size:13px;outline:none}
+  .form input:focus,.form textarea:focus,.form select:focus{border-color:var(--accent-2)}
+  .form .tkr-in{font-family:var(--mono);text-transform:uppercase}
+  .form textarea{resize:vertical;min-height:48px;font-family:inherit}
+  .form .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+  .conv-pick{display:flex;gap:6px;align-items:center}
+  .conv-pick button{background:var(--surface);border:1px solid var(--line-cool);color:var(--muted);
+    border-radius:6px;padding:6px 12px;font-family:var(--mono);font-size:13px}
+  .conv-pick button.sel{border-color:var(--accent);color:var(--accent);background:rgba(233,165,60,.08)}
+  .add-sector{border:1px dashed var(--line-cool);background:rgba(255,255,255,.015);
+    display:flex;align-items:center;justify-content:center;min-height:160px;border-radius:12px;
+    color:var(--muted);font-size:13.5px;flex-direction:column;gap:8px;transition:.15s}
+  .add-sector:hover{border-color:var(--accent);color:var(--accent)}
+  .add-sector .big{font-size:26px;font-family:var(--mono);line-height:1}
+  footer{max-width:1500px;margin:0 auto;padding:0 24px 50px;color:var(--faint);font-size:11px;line-height:1.6}
+  footer .disc{border-top:1px solid var(--line-cool);padding-top:16px}
+  footer code{font-family:var(--mono);color:var(--muted)}
+  .flash{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--surface-2);border:1px solid var(--accent);color:var(--text);
+    padding:10px 18px;border-radius:8px;font-size:13px;z-index:60;opacity:0;
+    transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.5);pointer-events:none;max-width:80vw}
+  .flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+
+<header class="bar">
+  <div class="brand">
+    <span class="glyph">▦</span>
+    <div>
+      <h1>Sektör Masası</h1>
+      <div class="sub">ABD piyasaları · tematik small-cap takibi</div>
+    </div>
+  </div>
+  <div class="tools">
+    <div class="search"><span>⌕</span><input id="search" type="text" placeholder="Ticker veya sektör ara" aria-label="Ara" /></div>
+    <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
+    <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
+    <button class="btn ghost" id="resetBtn" title="Başlangıç haline döndür">↺ Sıfırla</button>
+    <input type="file" id="fileInput" accept="application/json" hidden />
+  </div>
+</header>
+
+<div class="srcbar" id="srcbar"></div>
+<div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
+<div class="stats" id="stats"></div>
+<div class="filterbar" id="filterbar"></div>
+
+<main><div class="grid" id="grid"></div></main>
+
+<footer>
+  <div class="disc">
+    Önerilen tickerlar tartışma başlangıcıdır — <b>yatırım tavsiyesi değildir.</b>
+    Eklemeden önce kendi iş-yapış analizini yap.
+    Ortak dosyaya bağlıyken aynı anda iki kişi yazarsa <b>son kaydeden geçerli olur</b>; pano açık panellerdeki değişikliği birkaç saniyede otomatik yeniler.
+  </div>
+</footer>
+
+<div class="modal" id="chartModal" hidden>
+  <div class="modal-bg" id="modalBg"></div>
+  <div class="modal-card">
+    <button class="modal-x" id="modalX" title="Kapat">✕</button>
+    <div class="modal-head" id="modalHead"></div>
+    <div class="modal-range" id="modalRange"></div>
+    <canvas id="chartCanvas" width="520" height="300"></canvas>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<script>
+const KEY="sektor-masasi-v1";
+const FS_OK = !!(window.showOpenFilePicker && window.showSaveFilePicker);
+const IN_FRAME = window.top !== window.self;
+
+const SEED=[
+  {name:"Veri Merkezi Enerjisi & Güç", thesis:"AI veri merkezlerinin patlayan elektrik talebini karşılayanlar: yakıt hücresi, güç dağıtımı, bağımsız üreticiler ve şebeke ekipmanı.",
+   suggestions:[["BE","Bloom Energy"],["VRT","Vertiv"],["TLN","Talen Energy"],["POWL","Powell Industries"],["BWXT","BWX Technologies"],["GEV","GE Vernova"]]},
+  {name:"Yarı İletken & Çip (Small/Mid)", thesis:"Mega-cap dışı çip oyuncuları: bağlantı/connectivity, güç yarı iletkenleri, test ekipmanı ve foto-maske tedarikçileri.",
+   suggestions:[["CRDO","Credo Technology"],["ALAB","Astera Labs"],["SITM","SiTime"],["AEHR","Aehr Test Systems"],["NVTS","Navitas"],["POWI","Power Integrations"],["PLAB","Photronics"],["ONTO","Onto Innovation"],["INDI","indie Semiconductor"]]},
+  {name:"Savunma Sanayi & Savunma Teknolojisi", thesis:"İHA/drone, otonom sistemler, taktiksel iletişim ve niş savunma tedarikçileri — bütçe artışından beslenenler.",
+   suggestions:[["KTOS","Kratos Defense"],["AVAV","AeroVironment"],["DRS","Leonardo DRS"],["MRCY","Mercury Systems"],["RCAT","Red Cat"],["ONDS","Ondas Holdings"],["BYRN","Byrna"],["KRMN","Karman Holdings"]]},
+  {name:"Blockchain & Kripto Altyapısı", thesis:"Madencilik kapasitesini AI/HPC'ye çeviren bitcoin madencileri ve kripto altyapı oyuncuları.",
+   suggestions:[["WULF","TeraWulf"],["IREN","Iris Energy"],["CIFR","Cipher Mining"],["CORZ","Core Scientific"],["BTDR","Bitdeer"],["CLSK","CleanSpark"],["HUT","Hut 8"],["GLXY","Galaxy Digital"]]},
+  {name:"Nükleer & SMR / Uranyum", thesis:"Küçük modüler reaktörler (SMR) ve veri merkezi enerjisi için uranyum tedarik zinciri.",
+   suggestions:[["OKLO","Oklo"],["SMR","NuScale Power"],["NNE","Nano Nuclear Energy"],["LEU","Centrus Energy"],["UEC","Uranium Energy"],["DNN","Denison Mines"],["NXE","NexGen Energy"]]},
+  {name:"Yapay Zeka Altyapısı (Optik & Ağ)", thesis:"Veri merkezi içi/arası bağlantı: optik bileşenler, ağ donanımı ve neo-cloud GPU kiralama.",
+   suggestions:[["COHR","Coherent"],["LITE","Lumentum"],["FN","Fabrinet"],["APLD","Applied Digital"],["INOD","Innodata"],["CRDO","Credo Technology"]]},
+  {name:"Uzay & Uydu", thesis:"Fırlatma, uydu üretimi ve uzaydan doğrudan-cihaza (direct-to-cell) bağlantı oyuncuları.",
+   suggestions:[["RKLB","Rocket Lab"],["ASTS","AST SpaceMobile"],["LUNR","Intuitive Machines"],["RDW","Redwire"],["PL","Planet Labs"]]},
+  {name:"Siber Güvenlik (Small/Mid)", thesis:"Mega-cap dışı büyüyen güvenlik yazılımı: endpoint, veri koruma ve exposure management.",
+   suggestions:[["S","SentinelOne"],["TENB","Tenable"],["RPD","Rapid7"],["VRNS","Varonis"],["RBRK","Rubrik"],["QLYS","Qualys"]]},
+  {name:"Kuantum & Yeni Hesaplama (Spekülatif)", thesis:"Erken aşama kuantum donanım/yazılım — yüksek risk, yüksek büyüme opsiyonu. Küçük pozisyon mantığı.",
+   suggestions:[["IONQ","IonQ"],["RGTI","Rigetti Computing"],["QBTS","D-Wave Quantum"],["QUBT","Quantum Computing"]]},
+];
+
+let state=loadLocal();
+let ui={openForm:null, sectorFilter:new Set()};
+let fileHandle=null, pendingHandle=null, lastMod=0, writeTimer=null, pollTimer=null;
+let priceHandle=null, pendingPriceHandle=null, priceData=null, priceLastMod=0, pricePoll=null;
+
+/* ---------- helpers ---------- */
+function uid(){return "x"+(state.seq=(state.seq||0)+1).toString(36)+Math.abs((performance.now()*1000)|0).toString(36)}
+function seed(){let s={seq:0,sectors:[]};SEED.forEach(x=>s.sectors.push({id:"s"+(s.seq++),name:x.name,thesis:x.thesis,suggestions:x.suggestions.map(p=>({t:p[0],n:p[1]})),companies:[]}));return s;}
+function loadLocal(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return seed();}
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+function flash(msg){const f=document.getElementById("flash");f.textContent=msg;f.classList.add("show");clearTimeout(f._t);f._t=setTimeout(()=>f.classList.remove("show"),2400);}
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+/* ---------- IndexedDB (handle persistence) ---------- */
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("sm-db",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbSet(k,v){try{const db=await idb();await new Promise((res,rej)=>{const tx=db.transaction("kv","readwrite");tx.objectStore("kv").put(v,k);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}catch(e){}}
+async function idbGet(k){try{const db=await idb();return await new Promise((res,rej)=>{const tx=db.transaction("kv","readonly");const q=tx.objectStore("kv").get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});}catch(e){return null;}}
+
+/* ---------- file sync ---------- */
+async function ensurePerm(h,write){const o={mode:write?"readwrite":"read"};if((await h.queryPermission(o))==="granted")return true;return (await h.requestPermission(o))==="granted";}
+async function loadFromFile(){
+  const f=await fileHandle.getFile();lastMod=f.lastModified;
+  const t=(await f.text()).trim();
+  if(t){const d=JSON.parse(t);if(d&&d.sectors){state=d;saveLocal();return;}}
+  state=seed();await writeNow(); // empty/new file → seed it
+}
+async function writeNow(){
+  if(!fileHandle)return;
+  const w=await fileHandle.createWritable();
+  await w.write(JSON.stringify(state,null,2));await w.close();
+  try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
+}
+/* ================= GitHub canlı senkron ================= */
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json"};
+let ghToken=localStorage.getItem("sm-gh-token")||"";
+let dataSha=null, priceCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
+function ghReady(){return !!ghToken;}
+function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
+function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
+function b64decUtf8(b){const bin=atob((b||"").replace(/\s/g,""));const u=Uint8Array.from(bin,c=>c.charCodeAt(0));return new TextDecoder().decode(u);}
+function ghApi(path,opts){return fetch("https://api.github.com/repos/"+GH.user+"/"+GH.repo+path,opts);}
+async function ghLoadData(){
+  const r=await ghApi("/contents/"+GH.dataFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});
+  if(r.status===404){dataSha=null;return;}
+  if(r.status===401)throw new Error("Token geçersiz (401)");
+  if(!r.ok)throw new Error("Veri okunamadı ("+r.status+")");
+  const j=await r.json();dataSha=j.sha;
+  const txt=b64decUtf8(j.content);
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.sectors){state=d;saveLocal();}}
+}
+async function ghLoadPrice(){
+  const r=await ghApi("/contents/"+GH.priceFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.quotes){priceData=d;let lbl="yüklendi";if(d.updated){try{lbl=new Date(d.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}priceData.updatedLabel=lbl;}}
+  priceCommit=await ghLatestCommit(GH.priceFile);
+}
+async function ghLatestCommit(path){try{const r=await ghApi("/commits?path="+encodeURIComponent(path)+"&sha="+GH.branch+"&per_page=1&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});if(!r.ok)return null;const a=await r.json();return (a&&a[0])?a[0].sha:null;}catch(e){return null;}}
+async function ghSaveData(){
+  if(!ghReady())return;
+  const mk=()=>({message:"pano güncelleme",content:b64encUtf8(JSON.stringify(state,null,2)),branch:GH.branch,sha:dataSha||undefined});
+  let r=await ghApi("/contents/"+GH.dataFile,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(mk())});
+  if(r.status===409||r.status===422){await ghLoadData();r=await ghApi("/contents/"+GH.dataFile,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(mk())});}
+  if(!r.ok){flash("GitHub'a yazılamadı ("+r.status+")");return;}
+  const j=await r.json();if(j.content&&j.content.sha)dataSha=j.content.sha;
+}
+function scheduleWrite(){ saveLocal(); if(!ghReady())return; clearTimeout(ghWriteTimer); ghWriteTimer=setTimeout(()=>ghSaveData().catch(e=>flash("Yazma hatası: "+e.message)),700); }
+function startGitPoll(){
+  if(ghPollTimer)clearInterval(ghPollTimer);
+  ghPollTimer=setInterval(async()=>{
+    if(!ghReady()||ui.openForm||ghBusy)return;
+    ghBusy=true;
+    try{
+      const r=await ghApi("/contents/"+GH.dataFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});
+      if(r.ok){const j=await r.json();if(j.sha!==dataSha){dataSha=j.sha;const txt=b64decUtf8(j.content);const d=JSON.parse(txt);if(d&&d.sectors){state=d;saveLocal();render(true);flash("Ortak veri güncellendi");}}}
+      const pc=await ghLatestCommit(GH.priceFile);
+      if(pc&&pc!==priceCommit){await ghLoadPrice();render(true);flash("Piyasa verisi güncellendi");}
+    }catch(e){}finally{ghBusy=false;}
+  },25000);
+}
+function setToken(){
+  const t=prompt("GitHub fine-grained token'ını yapıştır (github_pat_...).\nSadece bu tarayıcıda saklanır:", "");
+  if(t===null)return;
+  ghToken=t.trim();
+  if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
+  if(!ghToken){renderSrcBar();return;}
+  flash("Bağlanılıyor…");
+  (async()=>{try{await ghLoadData();await ghLoadPrice();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+}
+function startPolling(){
+  if(pollTimer)clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    if(!fileHandle||ui.openForm)return;            // don't disturb active editing
+    try{
+      const f=await fileHandle.getFile();
+      if(f.lastModified>lastMod){
+        const t=(await f.text()).trim();
+        if(t){const d=JSON.parse(t);if(d&&d.sectors){state=d;lastMod=f.lastModified;saveLocal();render(true);flash("Ortak veri güncellendi");}}
+      }
+    }catch(e){}
+  },5000);
+}
+
+async function connectExisting(){
+  try{
+    const [h]=await window.showOpenFilePicker({types:[{description:"Sektör Masası verisi",accept:{"application/json":[".json"]}}]});
+    if(!await ensurePerm(h,true)){flash("İzin verilmedi");return;}
+    fileHandle=h;await loadFromFile();await idbSet("fileHandle",h);pendingHandle=null;
+    startPolling();render(true);flash("Ortak dosyaya bağlanıldı");
+  }catch(e){if(e&&e.name!=="AbortError")flash("Bağlanılamadı: "+e.message);}
+}
+async function createNew(){
+  try{
+    const h=await window.showSaveFilePicker({suggestedName:"sektor-masasi-veri.json",types:[{description:"Sektör Masası verisi",accept:{"application/json":[".json"]}}]});
+    if(!await ensurePerm(h,true)){flash("İzin verilmedi");return;}
+    fileHandle=h;state=seed();await writeNow();await idbSet("fileHandle",h);pendingHandle=null;
+    startPolling();render(true);flash("Yeni ortak dosya oluşturuldu");
+  }catch(e){if(e&&e.name!=="AbortError")flash("Oluşturulamadı: "+e.message);}
+}
+async function reconnect(){
+  if(!pendingHandle)return;
+  if(!await ensurePerm(pendingHandle,true)){flash("İzin verilmedi");return;}
+  fileHandle=pendingHandle;pendingHandle=null;
+  await loadFromFile();startPolling();render(true);flash("Yeniden bağlanıldı");
+}
+async function refreshNow(){
+  if(!fileHandle)return;
+  try{await loadFromFile();render(true);flash("Yenilendi");}catch(e){flash("Okunamadı: "+e.message);}
+}
+async function disconnect(){
+  fileHandle=null;pendingHandle=null;if(pollTimer)clearInterval(pollTimer);
+  await idbSet("fileHandle",null);renderSrcBar();flash("Bağlantı kesildi (yerel moda geçildi)");
+}
+
+/* ---------- market data (read-only feed from Python script) ---------- */
+function fmtMC(v){if(!v)return "";const a=Math.abs(v);if(a>=1e12)return "$"+(v/1e12).toFixed(2)+"T";if(a>=1e9)return "$"+(v/1e9).toFixed(1)+"B";if(a>=1e6)return "$"+(v/1e6).toFixed(0)+"M";return "$"+Math.round(v);}
+async function readPriceFile(){
+  const f=await priceHandle.getFile();priceLastMod=f.lastModified;
+  const t=(await f.text()).trim();
+  if(t){const d=JSON.parse(t);priceData=(d&&d.quotes)?d:{quotes:{}};
+    let lbl="yüklendi";
+    if(priceData.updated){try{lbl=new Date(priceData.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}
+    priceData.updatedLabel=lbl;
+  }else{priceData={quotes:{}};}
+}
+async function connectPrices(){
+  try{
+    const [h]=await window.showOpenFilePicker({types:[{description:"Piyasa verisi",accept:{"application/json":[".json"]}}]});
+    if((await h.queryPermission({mode:"read"}))!=="granted" && (await h.requestPermission({mode:"read"}))!=="granted"){flash("İzin verilmedi");return;}
+    priceHandle=h;await readPriceFile();await idbSet("priceHandle",h);pendingPriceHandle=null;
+    startPricePoll();render(true);flash("Piyasa verisi bağlandı");
+  }catch(e){if(e&&e.name!=="AbortError")flash("Piyasa verisi bağlanamadı: "+e.message);}
+}
+async function reconnectPrices(){
+  if(!pendingPriceHandle)return;
+  if((await pendingPriceHandle.requestPermission({mode:"read"}))!=="granted"){flash("İzin verilmedi");return;}
+  priceHandle=pendingPriceHandle;pendingPriceHandle=null;await readPriceFile();startPricePoll();render(true);flash("Piyasa verisi bağlandı");
+}
+async function loadPricesNow(){if(!priceHandle)return;try{await readPriceFile();render(true);flash("Piyasa verisi yenilendi");}catch(e){flash("Okunamadı: "+e.message);}}
+async function disconnectPrices(){priceHandle=null;pendingPriceHandle=null;priceData=null;if(pricePoll)clearInterval(pricePoll);await idbSet("priceHandle",null);render(true);flash("Piyasa verisi ayrıldı");}
+function startPricePoll(){if(pricePoll)clearInterval(pricePoll);pricePoll=setInterval(async()=>{if(!priceHandle)return;try{const f=await priceHandle.getFile();if(f.lastModified>priceLastMod){await readPriceFile();render(true);flash("Piyasa verisi güncellendi");}}catch(e){}},15000);}
+
+/* ---------- fiyat grafikleri (Canvas) ---------- */
+const C_GOOD="#7FB069", C_BAD="#D2654E";
+const RANGES=[["1A",21],["3A",63],["6A",126],["1Y",252]];
+let chartState={ticker:null,range:"6A"};
+let inlineRange={}; // ticker -> satır içi grafik aralığı
+function median(a){const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function hexA(h,a){const n=parseInt(h.slice(1),16);return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
+function histOf(t){const q=(priceData&&priceData.quotes)?priceData.quotes[(t||"").toUpperCase()]:null;return (q&&q.hist&&q.hist.c&&q.hist.c.length>1)?q.hist:null;}
+function drawSeries(cv,closes,opts){
+  opts=opts||{};const ctx=cv.getContext("2d");const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  if(!closes||closes.length<2)return;
+  const pad=opts.pad||0;
+  const mn=Math.min(...closes),mx=Math.max(...closes),rng=(mx-mn)||1,n=closes.length;
+  const X=i=>pad+(i/(n-1))*(W-2*pad);
+  const Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
+  const up=closes[n-1]>=closes[0];
+  const col=opts.color||(up?C_GOOD:C_BAD);
+  if(opts.fill){
+    ctx.beginPath();ctx.moveTo(X(0),H-pad);
+    for(let i=0;i<n;i++)ctx.lineTo(X(i),Y(closes[i]));
+    ctx.lineTo(X(n-1),H-pad);ctx.closePath();
+    const g=ctx.createLinearGradient(0,pad,0,H);g.addColorStop(0,hexA(col,.20));g.addColorStop(1,hexA(col,0));
+    ctx.fillStyle=g;ctx.fill();
+  }
+  ctx.beginPath();
+  for(let i=0;i<n;i++){const x=X(i),y=Y(closes[i]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.lineWidth=opts.lw||1.4;ctx.strokeStyle=col;ctx.lineJoin="round";ctx.lineCap="round";ctx.stroke();
+  if(opts.dot){ctx.fillStyle=col;ctx.beginPath();ctx.arc(X(n-1),Y(closes[n-1]),3,0,Math.PI*2);ctx.fill();}
+}
+// Eksenli (tarih/fiyat) satır-içi grafik
+function drawAxisChart(cv,hist,range){
+  const ctx=cv.getContext("2d");const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  if(!hist||!hist.c)return;
+  const rn=(RANGES.find(r=>r[0]===range)||RANGES[3])[1];
+  const closes=hist.c.slice(-rn),dates=hist.d.slice(-rn),n=closes.length;
+  if(n<2)return;
+  const padL=46,padR=8,padT=8,padB=20;
+  const mn=Math.min(...closes),mx=Math.max(...closes),rng=(mx-mn)||1;
+  const X=i=>padL+(i/(n-1))*(W-padL-padR);
+  const Y=v=>padT+(1-(v-mn)/rng)*(H-padT-padB);
+  const up=closes[n-1]>=closes[0],col=up?C_GOOD:C_BAD;
+  ctx.font="9px ui-monospace,Consolas,monospace";
+  // Y ekseni: yatay çizgiler + fiyat seviyeleri
+  ctx.textBaseline="middle";ctx.textAlign="right";
+  const yl=4;
+  for(let k=0;k<=yl;k++){
+    const v=mn+rng*k/yl,y=Y(v);
+    ctx.strokeStyle="rgba(255,255,255,.05)";ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillStyle="#6b7480";ctx.fillText("$"+(v>=100?v.toFixed(0):v.toFixed(1)),padL-5,y);
+  }
+  // alan dolgusu
+  ctx.beginPath();ctx.moveTo(X(0),H-padB);
+  for(let i=0;i<n;i++)ctx.lineTo(X(i),Y(closes[i]));
+  ctx.lineTo(X(n-1),H-padB);ctx.closePath();
+  const g=ctx.createLinearGradient(0,padT,0,H-padB);g.addColorStop(0,hexA(col,.20));g.addColorStop(1,hexA(col,0));
+  ctx.fillStyle=g;ctx.fill();
+  // çizgi
+  ctx.beginPath();for(let i=0;i<n;i++){const x=X(i),y=Y(closes[i]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.lineWidth=1.6;ctx.strokeStyle=col;ctx.lineJoin="round";ctx.stroke();
+  ctx.fillStyle=col;ctx.beginPath();ctx.arc(X(n-1),Y(closes[n-1]),2.5,0,Math.PI*2);ctx.fill();
+  // X ekseni: tarihler (baş / orta / son)
+  ctx.fillStyle="#6b7480";ctx.textBaseline="alphabetic";
+  const idxs=[0,Math.floor((n-1)/2),n-1],al=["left","center","right"];
+  idxs.forEach((idx,j)=>{const d=dates[idx]||"";const lbl=d.slice(8,10)+"."+d.slice(5,7);ctx.textAlign=al[j];
+    ctx.fillText(lbl,Math.min(Math.max(X(idx),padL),W-padR),H-6);});
+}
+function drawSparklines(){
+  if(!priceData)return;
+  document.querySelectorAll('canvas[data-spark]').forEach(cv=>{
+    const h=histOf(cv.dataset.spark);if(!h)return;
+    if(cv.classList.contains('cochart'))drawAxisChart(cv,h,inlineRange[cv.dataset.spark]||"6A");
+    else drawSeries(cv,h.c.slice(-126),{lw:1.3,pad:2});
+  });
+}
+function openChart(ticker){
+  if(!histOf(ticker)){flash("Grafik verisi yok — fiyat-guncelle.bat çalıştır");return;}
+  chartState.ticker=ticker.toUpperCase();
+  document.getElementById("chartModal").hidden=false;
+  renderChart();
+}
+function closeChart(){document.getElementById("chartModal").hidden=true;chartState.ticker=null;}
+function renderChart(){
+  const t=chartState.ticker;const q=priceData.quotes[t];const h=q.hist;
+  let nm="";for(const s of state.sectors){const c=s.companies.find(c=>c.ticker.toUpperCase()===t);if(c){nm=c.name||"";break;}}
+  const rn=(RANGES.find(r=>r[0]===chartState.range)||RANGES[2])[1];
+  const closes=h.c.slice(-rn),dates=h.d.slice(-rn);
+  const first=closes[0],last=closes[closes.length-1],ret=(last-first)/first*100;
+  const mn=Math.min(...closes),mx=Math.max(...closes),up=last>=first;
+  const chg=q.changePct;
+  document.getElementById("modalHead").innerHTML=`<div class="mh-t"><b>${esc(t)}</b> <span class="mh-n">${esc(nm)}</span></div>
+    <div class="mh-px">$${Number(q.price).toFixed(2)} <span class="chg ${chg>0?'up':(chg<0?'down':'')}">${chg>0?'+':''}${chg!=null?chg.toFixed(2):'0.00'}%</span></div>`;
+  document.getElementById("modalRange").innerHTML=RANGES.map(r=>`<button class="rbtn ${chartState.range===r[0]?'on':''}" data-r="${r[0]}">${r[0]}</button>`).join("");
+  document.querySelectorAll("#modalRange .rbtn").forEach(b=>b.onclick=()=>{chartState.range=b.dataset.r;renderChart();});
+  drawSeries(document.getElementById("chartCanvas"),closes,{fill:true,dot:true,lw:1.8,pad:8,color:up?C_GOOD:C_BAD});
+  const cc=up?"up":"down";
+  document.getElementById("modalFoot").innerHTML=`<span class="mf ${cc}">${chartState.range} getirisi <b>${ret>0?'+':''}${ret.toFixed(1)}%</b></span>
+    <span class="mf">En düşük <b>$${mn.toFixed(2)}</b></span><span class="mf">En yüksek <b>$${mx.toFixed(2)}</b></span>
+    <span class="mf dim">${esc(dates[0])} → ${esc(dates[dates.length-1])}</span>`;
+}
+
+/* ---------- render ---------- */
+function render(fromRemote){renderSrcBar();renderStats();renderFilter();renderTape();renderGrid();drawSparklines();wireEditForms();if(!fromRemote)scheduleWrite();}
+
+function renderFilter(){
+  const el=document.getElementById("filterbar");
+  const sel=ui.sectorFilter;
+  // stale id temizliği
+  [...sel].forEach(id=>{if(!state.sectors.some(s=>s.id===id))sel.delete(id);});
+  let html=`<span class="flabel">Göster</span>`;
+  html+=`<button class="fchip ${sel.size===0?'on':''}" data-all="1">Tümü<span class="fc">${state.sectors.length}</span></button>`;
+  html+=state.sectors.map(s=>`<button class="fchip ${sel.has(s.id)?'on':''}" data-id="${s.id}">${esc(s.name)}<span class="fc">${s.companies.length}</span></button>`).join("");
+  el.innerHTML=html;
+  el.querySelector('[data-all]').onclick=()=>{ui.sectorFilter=new Set();render(true);};
+  el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.id;
+    if(sel.has(id))sel.delete(id);else sel.add(id);
+    render(true);
+  });
+}
+function allCompanies(){return state.sectors.flatMap(s=>s.companies);}
+
+function renderSrcBar(){
+  const el=document.getElementById("srcbar");
+  let left,right="";
+  if(IN_FRAME){
+    el.innerHTML=`<div class="status"><span class="sdot off"></span><span class="path">Önizleme modu — canlı veri için dosyayı bilgisayarında aç</span></div>`;
+    return;
+  }
+  if(ghReady()){
+    const pl=priceData?`<span class="srcsep"></span><span class="pxstat"><span class="sdot on"></span>📈 ${esc(priceData.updatedLabel||"")}</span>`:"";
+    left=`<span class="sdot on"></span><span class="path">GitHub'a bağlı: <b>${esc(GH.user)}/${esc(GH.repo)}</b></span>${pl}`;
+    right=`<button class="btn sm" id="ghRefresh" title="Şimdi yenile">↻ Yenile</button>
+           <button class="btn ghost sm" id="ghTokenBtn" title="Token'ı değiştir/kaldır">🔑 Token</button>`;
+  }else{
+    left=`<span class="sdot warn"></span><span class="path">GitHub'a bağlı değil — token girilmesi gerekiyor</span>`;
+    right=`<button class="btn primary sm" id="ghSet">🔑 GitHub token'ı gir</button>`;
+  }
+  el.innerHTML=`<div class="status">${left}</div><span class="spacer"></span>${right}`;
+  const b=id=>el.querySelector("#"+id);
+  if(b("ghRefresh"))b("ghRefresh").onclick=()=>{flash("Yenileniyor…");ghLoadData().then(ghLoadPrice).then(()=>{render(true);flash("Yenilendi");}).catch(e=>flash("Hata: "+e.message));};
+  if(b("ghTokenBtn"))b("ghTokenBtn").onclick=setToken;
+  if(b("ghSet"))b("ghSet").onclick=setToken;
+}
+
+function renderStats(){
+  const cos=allCompanies();const high=cos.filter(c=>c.conv>=3).length;
+  document.getElementById("stats").innerHTML=`
+    <div class="stat"><span class="n">${state.sectors.length}</span><span class="l">Sektör</span></div>
+    <div class="stat"><span class="n">${cos.length}</span><span class="l">Takip edilen şirket</span></div>
+    <div class="stat"><span class="n amber">${high}</span><span class="l">Yüksek konviksiyon</span></div>`;
+}
+function renderTape(){
+  const cos=allCompanies();let items;
+  if(cos.length){items=cos.map(c=>`<span class="tape-item"><b>${esc(c.ticker)}</b> <span class="nm">${esc(c.name||"")}</span></span>`);}
+  else{items=state.sectors.flatMap(s=>s.suggestions).slice(0,24).map(p=>`<span class="tape-item"><b>${esc(p.t)}</b> <span class="nm">${esc(p.n)}</span></span>`);}
+  if(!items.length)items=['<span class="tape-item nm">şirket eklemeye başla…</span>'];
+  document.getElementById("tape").innerHTML=items.join("")+items.join("");
+}
+function renderGrid(){
+  const q=(document.getElementById("search").value||"").trim().toUpperCase();
+  const grid=document.getElementById("grid");grid.innerHTML="";
+  let shown=0;
+  state.sectors.forEach((sec,i)=>{
+    if(ui.sectorFilter.size && !ui.sectorFilter.has(sec.id))return;
+    if(q){const hit=sec.name.toUpperCase().includes(q)||sec.companies.some(c=>(c.ticker+" "+(c.name||"")).toUpperCase().includes(q))||sec.suggestions.some(p=>(p.t+" "+p.n).toUpperCase().includes(q));if(!hit)return;}
+    grid.appendChild(cardEl(sec,i));shown++;
+  });
+  // Filtre aktifken kartları ekran genişliğine yay; Tümü'de normal düzen.
+  if(ui.sectorFilter.size){
+    grid.style.gridTemplateColumns=`repeat(${Math.min(shown||1,3)}, minmax(0,1fr))`;
+  }else{
+    grid.style.gridTemplateColumns="";
+    const add=document.createElement("button");add.className="add-sector";
+    add.innerHTML='<span class="big">+</span><span>Yeni sektör ekle</span>';add.onclick=addSector;grid.appendChild(add);
+  }
+}
+function cardEl(sec,i){
+  const card=document.createElement("div");card.className="card";
+  const num=String(i+1).padStart(2,"0");
+  const added=new Set(sec.companies.map(c=>c.ticker.toUpperCase()));
+  const pes=sec.companies.map(c=>{const qq=(priceData&&priceData.quotes)?priceData.quotes[c.ticker.toUpperCase()]:null;return qq&&qq.pe;}).filter(v=>v&&v>0);
+  const secStats=pes.length?`<div class="sec-stats">Medyan F/K <b>${median(pes).toFixed(1)}</b> <span class="dim">· ${pes.length} şirket</span></div>`:"";
+  let body=sec.companies.length?sec.companies.map(c=>coRow(sec,c)).join(""):'<div class="empty-note">Henüz şirket yok. Aşağıdaki önerilerden birine dokun ya da kendin ekle.</div>';
+  const formHtml=(ui.openForm&&ui.openForm.sectorId===sec.id&&!ui.openForm.companyId)?formEl(sec,null,ui.openForm.prefill):"";
+  card.innerHTML=`
+    <div class="card-head"><div class="card-top">
+      <span class="idx">${num}</span><h2>${esc(sec.name)}</h2>
+      <div class="card-actions">
+        <button class="iconbtn" data-act="editSec" title="Sektörü düzenle">✎</button>
+        <button class="iconbtn del" data-act="delSec" title="Sektörü sil">✕</button>
+      </div></div>
+      <p class="thesis">${esc(sec.thesis)}</p>${secStats}</div>
+    <div class="card-body">${body}${formHtml}${formHtml?"":'<button class="addco" data-act="addCo">+ Şirket ekle</button>'}</div>
+    <div class="sugg"><div class="lbl">Öneriler — eklemek için dokun</div><div class="chips">
+      ${sec.suggestions.map(p=>`<button class="chip ${added.has(p.t.toUpperCase())?'added':''}" data-act="addSugg" data-t="${esc(p.t)}" data-n="${esc(p.n)}" title="${esc(p.n)}"><span class="plus">+</span>${esc(p.t)}</button>`).join("")}
+    </div></div>`;
+  card.querySelector('[data-act="editSec"]').onclick=()=>editSector(sec.id);
+  card.querySelector('[data-act="delSec"]').onclick=()=>delSector(sec.id);
+  const addBtn=card.querySelector('[data-act="addCo"]');
+  if(addBtn)addBtn.onclick=()=>{ui.openForm={sectorId:sec.id,companyId:null,prefill:null};render(true);wireForm(document,sec,null);};
+  card.querySelectorAll('[data-act="addSugg"]').forEach(b=>b.onclick=()=>{ui.openForm={sectorId:sec.id,companyId:null,prefill:{ticker:b.dataset.t,name:b.dataset.n}};render(true);wireForm(document,sec,null);});
+  card.querySelectorAll('[data-act="editCo"]').forEach(b=>b.onclick=()=>{ui.openForm={sectorId:sec.id,companyId:b.dataset.id,prefill:null};render(true);});
+  card.querySelectorAll('[data-act="delCo"]').forEach(b=>b.onclick=()=>{const s=state.sectors.find(s=>s.id===sec.id);s.companies=s.companies.filter(c=>c.id!==b.dataset.id);render();});
+  card.querySelectorAll('[data-chart]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();openChart(b.dataset.chart);});
+  card.querySelectorAll('[data-ir]').forEach(b=>b.onclick=(e)=>{
+    e.stopPropagation();
+    const t=b.dataset.spark;inlineRange[t]=b.dataset.ir;
+    const wrap=b.closest('.cochart-wrap');
+    wrap.querySelectorAll('[data-ir]').forEach(x=>x.classList.toggle('on',x.dataset.ir===b.dataset.ir));
+    const cv=wrap.querySelector('canvas.cochart');if(cv)drawAxisChart(cv,histOf(t),b.dataset.ir);
+  });
+  return card;
+}
+function coRow(sec,c){
+  if(ui.openForm&&ui.openForm.sectorId===sec.id&&ui.openForm.companyId===c.id)return `<div class="co-edit-host" data-id="${c.id}">${formEl(sec,c,null)}</div>`;
+  const dots=[1,2,3].map(n=>`<span class="dot ${c.conv>=n?'on':''}"></span>`).join("");
+  const q=(priceData&&priceData.quotes)?priceData.quotes[c.ticker.toUpperCase()]:null;
+  const hasHist=!!(q&&q.hist&&q.hist.c&&q.hist.c.length>1);
+  const focused=ui.sectorFilter.size>0;
+  const tkrCls="tkr"+(hasHist?" live":"");
+  const tkrAttr=hasHist?` data-chart="${esc(c.ticker)}"`:"";
+  const spark=(ui.sectorFilter.size>=2&&hasHist)?`<canvas class="spark" data-spark="${esc(c.ticker)}" data-chart="${esc(c.ticker)}" width="150" height="36"></canvas>`:"";
+  const band=(q&&q.size)?q.size:c.size;
+  const sizeTag=band?`<span class="size-tag">${esc(band)}</span>`:"";
+  const mcTag=(q&&q.marketCap)?`<span class="mc-tag" title="Piyasa değeri">${fmtMC(q.marketCap)}</span>`:"";
+  let px="";
+  if(q&&q.price!=null){
+    const chg=q.changePct;
+    const cls=chg>0?"up":(chg<0?"down":"");
+    const chgTxt=(chg!=null)?` <span class="chg ${cls}">${chg>0?"+":""}${chg.toFixed(2)}%</span>`:"";
+    px=`<span class="px">$${Number(q.price).toFixed(2)}${chgTxt}</span>`;
+  }
+  let metrics="";
+  if(q){
+    const p=[];
+    if(q.pe!=null)p.push(`<span class="m">F/K <b>${q.pe.toFixed(1)}</b></span>`);
+    if(q.fwdPe!=null)p.push(`<span class="m">İleri F/K <b>${q.fwdPe.toFixed(1)}</b></span>`);
+    if(q.ebitda!=null)p.push(`<span class="m">EBITDA <b>${fmtMC(q.ebitda)}</b></span>`);
+    if(q.epsG!=null){const c2=q.epsG>0?"up":(q.epsG<0?"down":"");p.push(`<span class="m">EPS büy. <b class="${c2}">${q.epsG>0?"+":""}${q.epsG.toFixed(0)}%</b></span>`);}
+    if(q.target!=null){const up=q.upside;const c3=(up>0)?"up":(up<0?"down":"");const ut=(up!=null)?` <span class="chg ${c3}">${up>0?"+":""}${up.toFixed(0)}%</span>`:"";p.push(`<span class="m">Hedef <b>$${q.target.toFixed(2)}</b>${ut}</span>`);}
+    if(q.analysts)p.push(`<span class="m" title="${esc(q.rec||"")}">${q.analysts} analist</span>`);
+    if(p.length)metrics=`<div class="metrics">${p.join("")}</div>`;
+  }
+  const convTools=`<span class="conv" title="Konviksiyon ${c.conv||0}/3">${dots}</span>
+    <span class="co-tools"><button class="iconbtn" data-act="editCo" data-id="${c.id}" title="Düzenle">✎</button>
+    <button class="iconbtn del" data-act="delCo" data-id="${c.id}" title="Sil">✕</button></span>`;
+  const nameLine=`${esc(c.name||"—")} ${sizeTag}${mcTag}`;
+  // Tek sektör seçili: solda finansallar, ORTADA yazı, sağda eksenli grafik (aralık kutulu)
+  if(ui.sectorFilter.size===1){
+    const T=esc(c.ticker);
+    const ir=inlineRange[c.ticker.toUpperCase()]||"6A";
+    let chartBlock;
+    if(hasHist){
+      const btns=RANGES.map(r=>`<button class="ir ${ir===r[0]?'on':''}" data-ir="${r[0]}" data-spark="${esc(c.ticker.toUpperCase())}">${r[0]}</button>`).join("");
+      chartBlock=`<div class="cochart-wrap">
+        <div class="irange">${btns}</div>
+        <canvas class="cochart" data-spark="${esc(c.ticker.toUpperCase())}" data-chart="${T}" width="280" height="200"></canvas>
+      </div>`;
+    }else{
+      chartBlock=`<div class="cochart-wrap"><div class="cochart noh">grafik yok</div></div>`;
+    }
+    return `<div class="co cofx">
+      <div class="cofx-fin">
+        <div class="cofx-id"><span class="${tkrCls}"${tkrAttr}>${T}</span>${px}</div>
+        ${metrics}
+        <div class="cofx-cv">${convTools}</div>
+      </div>
+      <div class="cofx-text">
+        <div class="cofx-name">${nameLine}</div>
+        ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
+      </div>
+      ${chartBlock}
+    </div>`;
+  }
+  return `<div class="co">
+    <div class="co-id"><span class="${tkrCls}"${tkrAttr}>${esc(c.ticker)}</span>${px}${metrics}${spark}</div>
+    <div class="co-right"><span class="conv" title="Konviksiyon ${c.conv||0}/3">${dots}</span>
+    <span class="co-tools"><button class="iconbtn" data-act="editCo" data-id="${c.id}" title="Düzenle">✎</button>
+    <button class="iconbtn del" data-act="delCo" data-id="${c.id}" title="Sil">✕</button></span></div>
+    <div class="meta"><div class="nm">${esc(c.name||"—")} ${sizeTag}${mcTag}</div>${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div></div>`;
+}
+function formEl(sec,co,prefill){
+  const v=co||prefill||{};const conv=co?co.conv:2;
+  return `<div class="form" data-form="1">
+    <div class="row">
+      <div style="flex:0 0 90px"><label>Ticker</label><input class="tkr-in f-ticker" value="${esc(v.ticker||"")}" placeholder="OKLO" maxlength="8" /></div>
+      <div style="flex:1"><label>Şirket adı</label><input class="f-name" value="${esc(v.name||"")}" placeholder="Oklo Inc." /></div>
+    </div>
+    <div class="row">
+      <div style="flex:1"><label>Büyüklük</label><select class="f-size">
+        ${["","Micro","Small","Mid","Large"].map(o=>`<option value="${o}" ${(co&&co.size===o)?"selected":(!co&&o==="Small"?"selected":"")}>${o||"—"}</option>`).join("")}
+      </select></div>
+      <div style="flex:2"><label>Konviksiyon</label><div class="conv-pick f-conv">
+        ${[1,2,3].map(n=>`<button type="button" data-c="${n}" class="${conv===n?'sel':''}">${"●".repeat(n)}</button>`).join("")}
+      </div></div>
+    </div>
+    <div><label>Not / iş-yapış tezin</label><textarea class="f-note" placeholder="Bu şirket sektörde tam olarak ne yapıyor? Neden büyür?">${esc(v.note||"")}</textarea></div>
+    <div class="actions"><button class="btn ghost f-cancel">İptal</button><button class="btn primary f-save">${co?"Güncelle":"Ekle"}</button></div>
+  </div>`;
+}
+function wireForm(root,sec,co){
+  const form=root.querySelector('[data-form="1"]');if(!form)return;
+  let conv=co?co.conv:2;
+  form.querySelectorAll('.f-conv button').forEach(b=>b.onclick=()=>{conv=+b.dataset.c;form.querySelectorAll('.f-conv button').forEach(x=>x.classList.toggle('sel',+x.dataset.c===conv));});
+  form.querySelector('.f-cancel').onclick=()=>{ui.openForm=null;render(true);};
+  form.querySelector('.f-save').onclick=()=>{
+    const ticker=form.querySelector('.f-ticker').value.trim().toUpperCase();
+    if(!ticker){flash("Ticker gerekli");return;}
+    const data={ticker,name:form.querySelector('.f-name').value.trim(),note:form.querySelector('.f-note').value.trim(),size:form.querySelector('.f-size').value,conv};
+    const s=state.sectors.find(s=>s.id===sec.id);
+    if(co){Object.assign(co,data);}else{data.id=uid();s.companies.push(data);}
+    ui.openForm=null;render();flash(co?"Güncellendi":ticker+" eklendi");
+  };
+  const t=form.querySelector('.f-ticker');if(t&&!co&&!t.value)t.focus();
+}
+function wireEditForms(){
+  document.querySelectorAll('.co-edit-host').forEach(host=>{
+    const id=host.dataset.id;const sec=state.sectors.find(s=>s.companies.some(c=>c.id===id));const co=sec.companies.find(c=>c.id===id);
+    wireForm(host,sec,co);
+  });
+  // re-focus add form if open
+  if(ui.openForm&&!ui.openForm.companyId){const sec=state.sectors.find(s=>s.id===ui.openForm.sectorId);if(sec)wireForm(document,sec,null);}
+}
+
+/* ---------- sector ops ---------- */
+function addSector(){
+  const name=prompt("Yeni sektör adı:");if(!name)return;
+  const thesis=prompt("Kısa tez / bu sektörü nasıl tanımlıyorsun? (boş bırakabilirsin)")||"";
+  state.sectors.push({id:"s"+(state.seq=(state.seq||0)+1),name:name.trim(),thesis:thesis.trim(),suggestions:[],companies:[]});
+  render();flash("Sektör eklendi");
+}
+function editSector(id){
+  const s=state.sectors.find(s=>s.id===id);
+  const name=prompt("Sektör adı:",s.name);if(name===null)return;
+  const thesis=prompt("Tez:",s.thesis);if(thesis===null)return;
+  s.name=name.trim();s.thesis=thesis.trim();render();
+}
+function delSector(id){
+  const s=state.sectors.find(s=>s.id===id);
+  if(!confirm(`"${s.name}" sektörü ve içindeki ${s.companies.length} şirket silinsin mi?`))return;
+  state.sectors=state.sectors.filter(s=>s.id!==id);render();flash("Sektör silindi");
+}
+
+/* ---------- global ops ---------- */
+document.getElementById("search").oninput=()=>renderGrid();
+document.getElementById("exportBtn").onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="sektor-masasi-yedek.json";a.click();URL.revokeObjectURL(a.href);flash("Yedek indirildi");
+};
+document.getElementById("importBtn").onclick=()=>document.getElementById("fileInput").click();
+document.getElementById("fileInput").onchange=(e)=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.sectors)throw 0;state=d;ui.openForm=null;render();flash("Veri yüklendi");}catch(err){flash("Geçersiz dosya");}};
+  r.readAsText(f);e.target.value="";
+};
+document.getElementById("resetBtn").onclick=()=>{
+  if(!confirm("Her şey başlangıç sektörlerine sıfırlanacak ve eklediğin şirketler silinecek. Emin misin?"))return;
+  state=seed();ui.openForm=null;render();flash("Sıfırlandı");
+};
+document.getElementById("modalX").onclick=closeChart;
+document.getElementById("modalBg").onclick=closeChart;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("chartModal").hidden)closeChart();});
+
+/* ---------- startup ---------- */
+async function init(){
+  state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
+  render(true);
+  if(!IN_FRAME && ghReady()){
+    try{await ghLoadData();await ghLoadPrice();startGitPoll();render(true);}
+    catch(e){flash("GitHub bağlantı hatası: "+e.message);}
+  }
+}
+init();
+</script>
