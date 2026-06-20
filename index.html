@@ -212,29 +212,42 @@
   .rotwin{background:none;border:none;color:var(--muted);border-radius:5px;padding:3px 10px;font-family:var(--mono);font-size:11px}
   .rotwin:hover{color:var(--text)}
   .rotwin.on{background:rgba(233,165,60,.12);color:var(--accent)}
-  .rot-base{font-family:var(--mono);font-size:11px;color:var(--faint)}
-  .rot-base b{color:var(--muted)}
+  .rot-klabel{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .rot-ref{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .rot-ref b{font-weight:600;color:var(--muted)}
+  .rot-ref b.up{color:var(--good)}
+  .rot-ref b.down{color:var(--bad)}
   .rot-spacer{margin-left:auto}
   .rot-toggle{background:none;border:none;color:var(--faint);font-family:var(--mono);font-size:11px}
   .rot-toggle:hover{color:var(--text)}
   .rot-list{display:flex;flex-direction:column;gap:2px;padding-bottom:10px}
   .rot-row{display:flex;align-items:center;gap:10px;padding:3px 0}
-  .rot-name{flex:0 0 200px;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rot-name{flex:0 0 180px;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .rot-row.lag .rot-name{color:var(--muted)}
+  .rot-colhead{padding-bottom:3px!important;border-bottom:1px solid var(--line-cool);margin-bottom:4px}
+  .rot-colhead span{color:var(--faint)!important;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
   .rot-track{flex:1;position:relative;height:14px;background:rgba(255,255,255,.03);border-radius:3px;min-width:120px}
   .rot-mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.14)}
   .rot-bar{position:absolute;top:2px;bottom:2px;border-radius:2px;min-width:1px}
   .rot-bar.pos{background:linear-gradient(90deg,rgba(127,176,105,.45),var(--good))}
   .rot-bar.neg{background:linear-gradient(270deg,rgba(210,101,78,.45),var(--bad))}
-  .rot-ret{flex:0 0 58px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600}
+  .rot-ret{flex:0 0 54px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600}
   .rot-ret.up{color:var(--good)}
   .rot-ret.down{color:var(--bad)}
-  .rot-z{flex:0 0 62px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .rot-exc{flex:0 0 52px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .rot-exc.up{color:var(--good)}
+  .rot-exc.down{color:var(--bad)}
+  .rot-exc.dim{color:var(--faint)}
+  .rot-z{flex:0 0 50px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--faint)}
   .rot-z.lead{color:var(--good)}
   .rot-z.lag{color:var(--bad)}
-  .rot-meta{flex:0 0 78px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .rot-tz{flex:0 0 54px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .rot-tz.hot{color:var(--accent)}
+  .rot-tz.cold{color:var(--accent-2)}
+  .rot-tz.mid,.rot-tz.dim{color:var(--faint)}
+  .rot-meta{flex:0 0 74px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--faint)}
   .rot-empty,.rot-nodata{font-family:var(--mono);font-size:11px;color:var(--faint);padding:4px 0 10px}
-  @media(max-width:700px){.rot-name{flex-basis:120px}.rot-meta{display:none}}
+  @media(max-width:760px){.rot-name{flex-basis:110px}.rot-meta,.rot-exc{display:none}}
   /* chart modal */
   .modal[hidden]{display:none}
   .modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center}
@@ -663,42 +676,66 @@ function renderChart(){
 }
 
 /* ---------- render ---------- */
-/* ---------- Sektör Rotasyonu (haftalık/aylık ayrışma; yalnızca görünüm, veriye yazmaz) ---------- */
+/* ---------- Sektör Rotasyonu (haftalık/aylık ayrışma + 252g doygunluk; yalnızca görünüm) ---------- */
 let rotationWin=localStorage.getItem("sm-rotwin")||"1A";
 let rotationOpen=localStorage.getItem("sm-rotopen")!=="0";
+let rotBase=localStorage.getItem("sm-rotbase")||"IWM";   // kıyas: evren | SPY | QQQ | IWM
 const ROT_WINDOWS=[["1H",5],["1A",21]]; // işlem günü: ~1 hafta / ~1 ay
+const BENCHES=["SPY","QQQ","IWM"];
 function winReturn(closes,n){
   if(!closes||closes.length<n+1)return null;
   const last=closes[closes.length-1],prev=closes[closes.length-1-n];
   if(!prev||isNaN(last)||isNaN(prev))return null;
   return (last/prev-1)*100;
 }
+// Senin istediğin z: hissenin kendi son ~1 yıllık (252 işlem günü) fiyat aralığına
+// göre konumu. Yüksek (+) = aralığın tepesinde / doygun, düşük (−) = dipte.
+function temporalZ(closes){
+  if(!closes||closes.length<60)return null;   // anlamlı z için en az ~3 ay
+  const s=closes.slice(-252);
+  const m=s.reduce((a,b)=>a+b,0)/s.length;
+  let v=0;for(let i=0;i<s.length;i++)v+=(s[i]-m)*(s[i]-m);
+  const sd=Math.sqrt(v/s.length);
+  return sd?(s[s.length-1]-m)/sd:null;
+}
+function benchReturns(days){const o={};BENCHES.forEach(b=>{const q=quoteOf(b);o[b]=(q&&q.hist&&q.hist.c)?winReturn(q.hist.c,days):null;});return o;}
 function sectorRotation(days){
   const rows=state.sectors.map(sec=>{
-    const rets=[];
-    sec.companies.forEach(c=>{const q=quoteOf(c.ticker);if(q&&q.hist&&q.hist.c){const r=winReturn(q.hist.c,days);if(r!=null)rets.push(r);}});
+    const rets=[],tzs=[];
+    sec.companies.forEach(c=>{const q=quoteOf(c.ticker);if(q&&q.hist&&q.hist.c){
+      const r=winReturn(q.hist.c,days);if(r!=null)rets.push(r);
+      const z=temporalZ(q.hist.c);if(z!=null)tzs.push(z);
+    }});
     if(!rets.length)return {sec,n:0,ret:null};
-    const mean=rets.reduce((a,b)=>a+b,0)/rets.length;        // eşit ağırlık
+    const mean=rets.reduce((a,b)=>a+b,0)/rets.length;        // eşit ağırlık getiri
     const up=rets.filter(r=>r>0).length;
-    return {sec,n:rets.length,ret:mean,breadth:Math.round(up/rets.length*100)};
+    const tz=tzs.length?tzs.reduce((a,b)=>a+b,0)/tzs.length:null; // 252g doygunluk z
+    return {sec,n:rets.length,ret:mean,breadth:Math.round(up/rets.length*100),tz};
   });
   const valid=rows.filter(r=>r.ret!=null);
-  const base=valid.length?valid.reduce((a,b)=>a+b.ret,0)/valid.length:0;  // kendi evren ortalaman
-  const sd=valid.length>1?Math.sqrt(valid.reduce((a,b)=>a+(b.ret-base)*(b.ret-base),0)/valid.length):0;
-  valid.forEach(r=>{r.rel=r.ret-base;r.z=sd?r.rel/sd:0;});               // sektörler-arası z-score
-  return {rows,base,sd};
+  const uni=valid.length?valid.reduce((a,b)=>a+b.ret,0)/valid.length:0;  // kendi evren ortalaman
+  const sd=valid.length>1?Math.sqrt(valid.reduce((a,b)=>a+(b.ret-uni)*(b.ret-uni),0)/valid.length):0;
+  let benchRet=null;
+  if(rotBase!=="evren"){const bq=quoteOf(rotBase);benchRet=(bq&&bq.hist&&bq.hist.c)?winReturn(bq.hist.c,days):null;}
+  const baseMissing=rotBase!=="evren"&&benchRet==null;
+  const baseline=(rotBase==="evren"||baseMissing)?uni:benchRet;          // kıyas çizgisi
+  valid.forEach(r=>{r.rel=r.ret-baseline;r.z=sd?r.rel/sd:0;});           // seçili baza göre z
+  return {rows,uni,sd,baseline,benchRet,baseMissing};
 }
 function renderRotation(){
   const el=document.getElementById("rotation");if(!el)return;
   if(!priceData||!priceData.quotes){el.innerHTML="";return;}             // fiyat verisi yoksa gizle
   const days=(ROT_WINDOWS.find(w=>w[0]===rotationWin)||ROT_WINDOWS[1])[1];
-  const {rows,base}=sectorRotation(days);
-  const valid=rows.filter(r=>r.ret!=null).sort((a,b)=>b.ret-a.ret);      // lider üstte
-  const winBtns=ROT_WINDOWS.map(w=>`<button class="rotwin ${rotationWin===w[0]?'on':''}" data-rw="${w[0]}">${w[0]==="1H"?"1 Hafta":"1 Ay"}</button>`).join("");
+  const R=sectorRotation(days);
+  const valid=R.rows.filter(r=>r.ret!=null).sort((a,b)=>b.ret-a.ret);    // lider üstte
+  const br=benchReturns(days);
+  const baseBtns=[["evren","Evren"],["SPY","SPY"],["QQQ","QQQ"],["IWM","IWM"]].map(b=>`<button class="rotwin ${rotBase===b[0]?'on':''}" data-rb="${b[0]}">${b[1]}</button>`).join("");
+  const refTxt=BENCHES.filter(b=>br[b]!=null).map(b=>`${b} <b class="${br[b]>=0?'up':'down'}">${br[b]>=0?'+':''}${br[b].toFixed(1)}%</b>`).join(" · ")||"benchmark verisi yok";
   const head=`<div class="rot-head">
     <span class="rot-title">Sektör Rotasyonu</span>
-    <span class="rot-win">${winBtns}</span>
-    <span class="rot-base">evren ort. <b>${base>=0?"+":""}${base.toFixed(1)}%</b></span>
+    <span class="rot-win">${ROT_WINDOWS.map(w=>`<button class="rotwin ${rotationWin===w[0]?'on':''}" data-rw="${w[0]}">${w[0]==="1H"?"1 Hafta":"1 Ay"}</button>`).join("")}</span>
+    <span class="rot-klabel">Kıyas</span><span class="rot-win">${baseBtns}</span>
+    <span class="rot-ref">${refTxt}</span>
     <span class="rot-spacer"></span>
     <button class="rot-toggle">${rotationOpen?"gizle ▾":"göster ▸"}</button>
   </div>`;
@@ -707,25 +744,43 @@ function renderRotation(){
     if(!valid.length){
       bodyHtml=`<div class="rot-empty">Rotasyon için hisse geçmişi yok — sektörlere hisse ekleyip fiyatları güncelle.</div>`;
     }else{
+      const baseName=rotBase==="evren"?"ort.":rotBase;
+      const colhead=`<div class="rot-row rot-colhead">
+        <span class="rot-name">Sektör</span><div class="rot-track"></div>
+        <span class="rot-ret">${rotationWin==="1H"?"1H":"1A"} getiri</span>
+        <span class="rot-exc">vs ${esc(baseName)}</span>
+        <span class="rot-z">z</span>
+        <span class="rot-tz">1Y z</span>
+        <span class="rot-meta">hisse</span>
+      </div>`;
       const maxAbs=Math.max(0.01,...valid.map(r=>Math.abs(r.ret)));
-      bodyHtml=`<div class="rot-list">`+valid.map(r=>{
+      const rowsHtml=valid.map(r=>{
         const pos=r.ret>=0,w=Math.abs(r.ret)/maxAbs*50;
         const bar=pos?`left:50%;width:${w}%`:`left:${50-w}%;width:${w}%`;
         const zc=r.z>=0.5?"lead":(r.z<=-0.5?"lag":"mid");
+        const exc=R.baseMissing?`<span class="rot-exc dim">—</span>`:`<span class="rot-exc ${r.rel>=0?'up':'down'}">${r.rel>=0?'+':''}${r.rel.toFixed(1)}</span>`;
+        let tzHtml=`<span class="rot-tz dim" title="252 günlük geçmiş yetersiz">—</span>`;
+        if(r.tz!=null){const tc=r.tz>=1?"hot":(r.tz<=-1?"cold":"mid");
+          tzHtml=`<span class="rot-tz ${tc}" title="252g: kendi 1-yıllık fiyat aralığına göre konum — yüksek=doygun/gergin, düşük=dipte">${r.tz>=0?'+':''}${r.tz.toFixed(1)}σ</span>`;}
         return `<div class="rot-row ${zc}">
           <span class="rot-name" title="${esc(r.sec.name)}">${esc(r.sec.name)}</span>
           <div class="rot-track"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${bar}"></div></div>
           <span class="rot-ret ${pos?"up":"down"}">${pos?"+":""}${r.ret.toFixed(1)}%</span>
-          <span class="rot-z ${zc}" title="sektörler-arası z-score (kendi evrenine göre güç)">z ${r.z>=0?"+":""}${r.z.toFixed(2)}</span>
-          <span class="rot-meta" title="kaç hisse · artıda olan %">${r.n}h · ${r.breadth}%↑</span>
+          ${exc}
+          <span class="rot-z ${zc}" title="seçili kıyasa göre güç (sektörler-arası)">${r.z>=0?"+":""}${r.z.toFixed(2)}</span>
+          ${tzHtml}
+          <span class="rot-meta" title="kaç hisse · artıda olan %">${r.n}h·${r.breadth}%↑</span>
         </div>`;
-      }).join("")+`</div>`;
-      const noData=rows.filter(r=>r.ret==null);
-      if(noData.length)bodyHtml+=`<div class="rot-nodata">Veri yetersiz: ${noData.map(r=>esc(r.sec.name)).join(" · ")}</div>`;
+      }).join("");
+      const miss=R.baseMissing?`<div class="rot-nodata">${esc(rotBase)} verisi henüz yok — bir sonraki fiyat güncellemesinde gelecek; şimdilik evren ortalaması kullanılıyor.</div>`:"";
+      const noData=R.rows.filter(r=>r.ret==null);
+      const nd=noData.length?`<div class="rot-nodata">Veri yetersiz: ${noData.map(r=>esc(r.sec.name)).join(" · ")}</div>`:"";
+      bodyHtml=colhead+`<div class="rot-list">`+rowsHtml+`</div>`+miss+nd;
     }
   }
   el.innerHTML=head+bodyHtml;
-  el.querySelectorAll(".rotwin").forEach(b=>b.onclick=()=>{rotationWin=b.dataset.rw;localStorage.setItem("sm-rotwin",rotationWin);renderRotation();});
+  el.querySelectorAll(".rotwin[data-rw]").forEach(b=>b.onclick=()=>{rotationWin=b.dataset.rw;localStorage.setItem("sm-rotwin",rotationWin);renderRotation();});
+  el.querySelectorAll(".rotwin[data-rb]").forEach(b=>b.onclick=()=>{rotBase=b.dataset.rb;localStorage.setItem("sm-rotbase",rotBase);renderRotation();});
   const tg=el.querySelector(".rot-toggle");if(tg)tg.onclick=()=>{rotationOpen=!rotationOpen;localStorage.setItem("sm-rotopen",rotationOpen?"1":"0");renderRotation();};
 }
 
