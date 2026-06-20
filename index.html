@@ -203,6 +203,13 @@
     padding:3px 9px;font-family:var(--mono);font-size:12px;line-height:1}
   .sortdir:hover:not(:disabled){border-color:var(--accent)}
   .sortdir:disabled{color:var(--faint);opacity:.45;cursor:default}
+  /* sektör başlığında 252g doygunluk mini grafiği */
+  .secz{display:inline-flex;align-items:center;gap:5px;flex:none;margin:2px 2px 0}
+  .seczc{display:block;width:64px;height:20px;background:rgba(0,0,0,.18);border:1px solid var(--line-cool);border-radius:4px}
+  .secz-val{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .secz-val.hot{color:var(--accent)}
+  .secz-val.cold{color:var(--accent-2)}
+  .secz-val.mid{color:var(--muted)}
   /* sektör rotasyonu paneli */
   .rotation{padding:0 24px;border-bottom:1px solid var(--line)}
   .rotation:empty{border-bottom:none;padding:0}
@@ -688,29 +695,47 @@ function winReturn(closes,n){
   if(!prev||isNaN(last)||isNaN(prev))return null;
   return (last/prev-1)*100;
 }
-// Senin istediğin z: hissenin kendi son ~1 yıllık (252 işlem günü) fiyat aralığına
-// göre konumu. Yüksek (+) = aralığın tepesinde / doygun, düşük (−) = dipte.
-function temporalZ(closes){
+// 252g doygunluk: hissenin kendi son ~1 yıllık fiyat aralığındaki z konumu, zaman
+// serisi olarak. Sektör genelinde ortalanıp kart başlığındaki mini grafiği besler.
+// Yüksek (+) = aralığın tepesinde/doygun, düşük (−) = dipte.
+function stockZSeries(closes){
   if(!closes||closes.length<60)return null;   // anlamlı z için en az ~3 ay
   const s=closes.slice(-252);
   const m=s.reduce((a,b)=>a+b,0)/s.length;
   let v=0;for(let i=0;i<s.length;i++)v+=(s[i]-m)*(s[i]-m);
   const sd=Math.sqrt(v/s.length);
-  return sd?(s[s.length-1]-m)/sd:null;
+  return sd?s.map(x=>(x-m)/sd):null;
+}
+function sectorZSeries(sec){
+  const sers=[];
+  sec.companies.forEach(c=>{const q=quoteOf(c.ticker);if(q&&q.hist&&q.hist.c){const z=stockZSeries(q.hist.c);if(z)sers.push(z);}});
+  if(!sers.length)return null;
+  const maxLen=Math.max(...sers.map(a=>a.length));
+  const out=[];
+  for(let p=0;p<maxLen;p++){let sum=0,cnt=0;for(const a of sers){const i=a.length-1-p;if(i>=0){sum+=a[i];cnt++;}}if(cnt)out.push(sum/cnt);}
+  out.reverse(); // kronolojik
+  return out;
+}
+function drawZSpark(cv,z){
+  const ctx=cv.getContext("2d"),W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
+  if(!z||z.length<2)return;
+  const pad=2;const mn=Math.min(0,...z),mx=Math.max(0,...z),rng=(mx-mn)||1;
+  const X=i=>pad+(i/(z.length-1))*(W-2*pad),Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
+  ctx.strokeStyle="rgba(255,255,255,.12)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(W-pad,Y(0));ctx.stroke(); // z=0 çizgisi
+  const last=z[z.length-1],col=last>=1?"#E9A53C":(last<=-1?"#6FA2CE":"#8B93A0");
+  ctx.beginPath();for(let i=0;i<z.length;i++){const x=X(i),y=Y(z[i]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+  ctx.lineWidth=1.4;ctx.strokeStyle=col;ctx.lineJoin="round";ctx.stroke();
+  ctx.fillStyle=col;ctx.beginPath();ctx.arc(X(z.length-1),Y(last),2,0,Math.PI*2);ctx.fill();
 }
 function benchReturns(days){const o={};BENCHES.forEach(b=>{const q=quoteOf(b);o[b]=(q&&q.hist&&q.hist.c)?winReturn(q.hist.c,days):null;});return o;}
 function sectorRotation(days){
   const rows=state.sectors.map(sec=>{
-    const rets=[],tzs=[];
-    sec.companies.forEach(c=>{const q=quoteOf(c.ticker);if(q&&q.hist&&q.hist.c){
-      const r=winReturn(q.hist.c,days);if(r!=null)rets.push(r);
-      const z=temporalZ(q.hist.c);if(z!=null)tzs.push(z);
-    }});
+    const rets=[];
+    sec.companies.forEach(c=>{const q=quoteOf(c.ticker);if(q&&q.hist&&q.hist.c){const r=winReturn(q.hist.c,days);if(r!=null)rets.push(r);}});
     if(!rets.length)return {sec,n:0,ret:null};
     const mean=rets.reduce((a,b)=>a+b,0)/rets.length;        // eşit ağırlık getiri
     const up=rets.filter(r=>r>0).length;
-    const tz=tzs.length?tzs.reduce((a,b)=>a+b,0)/tzs.length:null; // 252g doygunluk z
-    return {sec,n:rets.length,ret:mean,breadth:Math.round(up/rets.length*100),tz};
+    return {sec,n:rets.length,ret:mean,breadth:Math.round(up/rets.length*100)};
   });
   const valid=rows.filter(r=>r.ret!=null);
   const uni=valid.length?valid.reduce((a,b)=>a+b.ret,0)/valid.length:0;  // kendi evren ortalaman
@@ -750,7 +775,6 @@ function renderRotation(){
         <span class="rot-ret">${rotationWin==="1H"?"1H":"1A"} getiri</span>
         <span class="rot-exc">vs ${esc(baseName)}</span>
         <span class="rot-z">z</span>
-        <span class="rot-tz">1Y z</span>
         <span class="rot-meta">hisse</span>
       </div>`;
       const maxAbs=Math.max(0.01,...valid.map(r=>Math.abs(r.ret)));
@@ -759,16 +783,12 @@ function renderRotation(){
         const bar=pos?`left:50%;width:${w}%`:`left:${50-w}%;width:${w}%`;
         const zc=r.z>=0.5?"lead":(r.z<=-0.5?"lag":"mid");
         const exc=R.baseMissing?`<span class="rot-exc dim">—</span>`:`<span class="rot-exc ${r.rel>=0?'up':'down'}">${r.rel>=0?'+':''}${r.rel.toFixed(1)}</span>`;
-        let tzHtml=`<span class="rot-tz dim" title="252 günlük geçmiş yetersiz">—</span>`;
-        if(r.tz!=null){const tc=r.tz>=1?"hot":(r.tz<=-1?"cold":"mid");
-          tzHtml=`<span class="rot-tz ${tc}" title="252g: kendi 1-yıllık fiyat aralığına göre konum — yüksek=doygun/gergin, düşük=dipte">${r.tz>=0?'+':''}${r.tz.toFixed(1)}σ</span>`;}
         return `<div class="rot-row ${zc}">
           <span class="rot-name" title="${esc(r.sec.name)}">${esc(r.sec.name)}</span>
           <div class="rot-track"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${bar}"></div></div>
           <span class="rot-ret ${pos?"up":"down"}">${pos?"+":""}${r.ret.toFixed(1)}%</span>
           ${exc}
           <span class="rot-z ${zc}" title="seçili kıyasa göre güç (sektörler-arası)">${r.z>=0?"+":""}${r.z.toFixed(2)}</span>
-          ${tzHtml}
           <span class="rot-meta" title="kaç hisse · artıda olan %">${r.n}h·${r.breadth}%↑</span>
         </div>`;
       }).join("");
@@ -865,6 +885,10 @@ function cardEl(sec,i){
   const added=new Set(sec.companies.map(c=>c.ticker.toUpperCase()));
   const pes=sec.companies.map(c=>{const qq=(priceData&&priceData.quotes)?priceData.quotes[c.ticker.toUpperCase()]:null;return qq&&qq.pe;}).filter(v=>v&&v>0);
   const secStats=pes.length?`<div class="sec-stats">Medyan F/K <b>${median(pes).toFixed(1)}</b> <span class="dim">· ${pes.length} şirket</span></div>`:"";
+  const zser=sectorZSeries(sec);                       // 252g doygunluk z serisi (mini grafik)
+  const curZ=zser?zser[zser.length-1]:null;
+  const zCls=curZ==null?"":(curZ>=1?"hot":(curZ<=-1?"cold":"mid"));
+  const zSpark=zser?`<span class="secz" title="252g doygunluk — sektörün kendi 1-yıllık aralığındaki konumu (yüksek=doygun/tepede, düşük=dipte)"><canvas class="seczc" width="64" height="20"></canvas><span class="secz-val ${zCls}">${curZ>=0?"+":""}${curZ.toFixed(1)}σ</span></span>`:"";
   const spref=sortPref[sec.id]||{key:"manual",dir:"desc"};
   const sortCtl=sec.companies.length>1?`<span class="sortbar"><span class="slabel">Sırala</span>`+
     `<select class="sortsel" data-sortsec="${sec.id}">${SORT_KEYS.map(k=>`<option value="${k[0]}" ${spref.key===k[0]?"selected":""}>${k[1]}</option>`).join("")}</select>`+
@@ -873,7 +897,7 @@ function cardEl(sec,i){
   const formHtml=(ui.openForm&&ui.openForm.sectorId===sec.id&&!ui.openForm.companyId)?formEl(sec,null,ui.openForm.prefill):"";
   card.innerHTML=`
     <div class="card-head"><div class="card-top">
-      <span class="idx">${num}</span><h2>${esc(sec.name)}</h2>
+      <span class="idx">${num}</span><h2>${esc(sec.name)}</h2>${zSpark}
       <div class="card-actions">
         <button class="iconbtn" data-act="editSec" title="Sektörü düzenle">✎</button>
         <button class="iconbtn del" data-act="delSec" title="Sektörü sil">✕</button>
@@ -883,6 +907,7 @@ function cardEl(sec,i){
     <div class="sugg"><div class="lbl">Öneriler — eklemek için dokun</div><div class="chips">
       ${sec.suggestions.map(p=>`<button class="chip ${added.has(p.t.toUpperCase())?'added':''}" data-act="addSugg" data-t="${esc(p.t)}" data-n="${esc(p.n)}" title="${esc(p.n)}"><span class="plus">+</span>${esc(p.t)}</button>`).join("")}
     </div></div>`;
+  if(zser){const zc=card.querySelector(".seczc");if(zc)drawZSpark(zc,zser);}
   card.querySelector('[data-act="editSec"]').onclick=()=>editSector(sec.id);
   card.querySelector('[data-act="delSec"]').onclick=()=>delSector(sec.id);
   const addBtn=card.querySelector('[data-act="addCo"]');
