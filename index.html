@@ -203,17 +203,19 @@
     padding:3px 9px;font-family:var(--mono);font-size:12px;line-height:1}
   .sortdir:hover:not(:disabled){border-color:var(--accent)}
   .sortdir:disabled{color:var(--faint);opacity:.45;cursor:default}
-  /* sektör başlığında 252g doygunluk mini grafiği */
-  .secz{display:inline-flex;align-items:center;gap:6px;flex:none;margin:2px 2px 0}
-  .seczc{display:block;width:110px;height:30px;background:rgba(0,0,0,.18);border:1px solid var(--line-cool);border-radius:4px}
+  /* kart başlığı: sol metin + sağ doygunluk grafiği */
+  .ch-row{display:flex;gap:14px;align-items:flex-start}
+  .ch-main{flex:1;min-width:0}
+  .ch-chart{flex:none}
   .secz-val{font-family:var(--mono);font-size:11px;color:var(--faint)}
   .secz-val.hot{color:var(--accent)}
   .secz-val.cold{color:var(--accent-2)}
   .secz-val.mid{color:var(--muted)}
-  /* az sektör seçiliyken eksenli büyük doygunluk grafiği */
-  .seczbig-wrap{margin-top:11px}
-  .seczbig-head{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px;display:flex;gap:8px;align-items:center}
-  .seczbig{display:block;width:360px;max-width:100%;height:150px;background:rgba(0,0,0,.18);border:1px solid var(--line-cool);border-radius:8px}
+  /* eksenli doygunluk grafiği (her görünümde sağda) */
+  .seczbig-wrap{margin-top:0}
+  .seczbig-head{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .seczbig{display:block;max-width:100%;height:auto;background:rgba(0,0,0,.18);border:1px solid var(--line-cool);border-radius:8px}
+  @media(max-width:560px){.ch-row{flex-direction:column}.ch-chart{width:100%}}
   /* sektör rotasyonu paneli */
   .rotation{padding:0 24px;border-bottom:1px solid var(--line)}
   .rotation:empty{border-bottom:none;padding:0}
@@ -721,18 +723,7 @@ function sectorZSeries(sec){
   const dates=(longest&&longest.d)?longest.d.slice(-out.length):null; // en uzun geçmişli üyenin tarihleri
   return {z:out,dates};
 }
-function drawZSpark(cv,z){
-  const ctx=cv.getContext("2d"),W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
-  if(!z||z.length<2)return;
-  const pad=2;const mn=Math.min(0,...z),mx=Math.max(0,...z),rng=(mx-mn)||1;
-  const X=i=>pad+(i/(z.length-1))*(W-2*pad),Y=v=>pad+(1-(v-mn)/rng)*(H-2*pad);
-  ctx.strokeStyle="rgba(255,255,255,.12)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad,Y(0));ctx.lineTo(W-pad,Y(0));ctx.stroke(); // z=0 çizgisi
-  const last=z[z.length-1],col=last>=1?"#E9A53C":(last<=-1?"#6FA2CE":"#8B93A0");
-  ctx.beginPath();for(let i=0;i<z.length;i++){const x=X(i),y=Y(z[i]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
-  ctx.lineWidth=1.4;ctx.strokeStyle=col;ctx.lineJoin="round";ctx.stroke();
-  ctx.fillStyle=col;ctx.beginPath();ctx.arc(X(z.length-1),Y(last),2,0,Math.PI*2);ctx.fill();
-}
-// Eksenli (y: σ seviyeleri, x: tarih) büyük doygunluk grafiği — az sektör seçiliyken.
+// Eksenli (y: σ seviyeleri, x: tarih) doygunluk grafiği — kart başlığında sağda.
 function drawZAxis(cv,z,dates){
   const ctx=cv.getContext("2d"),W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
   if(!z||z.length<2)return;
@@ -928,9 +919,9 @@ function cardEl(sec,i){
   const curZ=zser?zser.z[zser.z.length-1]:null;
   const zCls=curZ==null?"":(curZ>=1?"hot":(curZ<=-1?"cold":"mid"));
   const zValTxt=curZ==null?"":`${curZ>=0?"+":""}${curZ.toFixed(1)}σ`;
-  const zFocus=ui.sectorFilter.size===1||ui.sectorFilter.size===2;  // az sektör → eksenli büyük grafik
-  const zSpark=(zser&&!zFocus)?`<span class="secz" title="252g doygunluk — sektörün kendi 1-yıllık aralığındaki konumu (yüksek=doygun/tepede, düşük=dipte)"><canvas class="seczc" width="110" height="30"></canvas><span class="secz-val ${zCls}">${zValTxt}</span></span>`:"";
-  const zBig=(zser&&zFocus)?`<div class="seczbig-wrap"><div class="seczbig-head">252g doygunluk z <span class="secz-val ${zCls}">${zValTxt}</span></div><canvas class="seczbig" width="360" height="150"></canvas></div>`:"";
+  const zFocus=ui.sectorFilter.size===1||ui.sectorFilter.size===2;  // az sektör → daha büyük grafik
+  const zW=zFocus?320:160, zH=zFocus?150:100;                       // her durumda sağda, eksenli
+  const zChart=zser?`<div class="seczbig-wrap"><div class="seczbig-head">252g doygunluk z <span class="secz-val ${zCls}">${zValTxt}</span></div><canvas class="seczbig" width="${zW}" height="${zH}"></canvas></div>`:"";
   const spref=sortPref[sec.id]||{key:"manual",dir:"desc"};
   const sortCtl=sec.companies.length>1?`<span class="sortbar"><span class="slabel">Sırala</span>`+
     `<select class="sortsel" data-sortsec="${sec.id}">${SORT_KEYS.map(k=>`<option value="${k[0]}" ${spref.key===k[0]?"selected":""}>${k[1]}</option>`).join("")}</select>`+
@@ -938,18 +929,18 @@ function cardEl(sec,i){
   let body=sec.companies.length?sortedCompanies(sec).map(c=>coRow(sec,c)).join(""):'<div class="empty-note">Henüz şirket yok. Aşağıdaki önerilerden birine dokun ya da kendin ekle.</div>';
   const formHtml=(ui.openForm&&ui.openForm.sectorId===sec.id&&!ui.openForm.companyId)?formEl(sec,null,ui.openForm.prefill):"";
   card.innerHTML=`
-    <div class="card-head"><div class="card-top">
-      <span class="idx">${num}</span><h2>${esc(sec.name)}</h2>${zSpark}
+    <div class="card-head"><div class="ch-row"><div class="ch-main"><div class="card-top">
+      <span class="idx">${num}</span><h2>${esc(sec.name)}</h2>
       <div class="card-actions">
         <button class="iconbtn" data-act="editSec" title="Sektörü düzenle">✎</button>
         <button class="iconbtn del" data-act="delSec" title="Sektörü sil">✕</button>
       </div></div>
-      <p class="thesis">${esc(sec.thesis)}</p>${secStats}${sortCtl}${zBig}</div>
+      <p class="thesis">${esc(sec.thesis)}</p>${secStats}${sortCtl}</div>${zChart?`<div class="ch-chart">${zChart}</div>`:""}</div></div>
     <div class="card-body">${body}${formHtml}${formHtml?"":'<button class="addco" data-act="addCo">+ Şirket ekle</button>'}</div>
     <div class="sugg"><div class="lbl">Öneriler — eklemek için dokun</div><div class="chips">
       ${sec.suggestions.map(p=>`<button class="chip ${added.has(p.t.toUpperCase())?'added':''}" data-act="addSugg" data-t="${esc(p.t)}" data-n="${esc(p.n)}" title="${esc(p.n)}"><span class="plus">+</span>${esc(p.t)}</button>`).join("")}
     </div></div>`;
-  if(zser){const sc=card.querySelector(".seczc");if(sc)drawZSpark(sc,zser.z);const sb=card.querySelector(".seczbig");if(sb)drawZAxis(sb,zser.z,zser.dates);}
+  if(zser){const sb=card.querySelector(".seczbig");if(sb)drawZAxis(sb,zser.z,zser.dates);}
   card.querySelector('[data-act="editSec"]').onclick=()=>editSector(sec.id);
   card.querySelector('[data-act="delSec"]').onclick=()=>delSector(sec.id);
   const addBtn=card.querySelector('[data-act="addCo"]');
