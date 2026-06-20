@@ -203,6 +203,38 @@
     padding:3px 9px;font-family:var(--mono);font-size:12px;line-height:1}
   .sortdir:hover:not(:disabled){border-color:var(--accent)}
   .sortdir:disabled{color:var(--faint);opacity:.45;cursor:default}
+  /* sektör rotasyonu paneli */
+  .rotation{padding:0 24px;border-bottom:1px solid var(--line)}
+  .rotation:empty{border-bottom:none;padding:0}
+  .rot-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0 8px}
+  .rot-title{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+  .rot-win{display:inline-flex;gap:3px;background:var(--surface);border:1px solid var(--line-cool);border-radius:7px;padding:3px}
+  .rotwin{background:none;border:none;color:var(--muted);border-radius:5px;padding:3px 10px;font-family:var(--mono);font-size:11px}
+  .rotwin:hover{color:var(--text)}
+  .rotwin.on{background:rgba(233,165,60,.12);color:var(--accent)}
+  .rot-base{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .rot-base b{color:var(--muted)}
+  .rot-spacer{margin-left:auto}
+  .rot-toggle{background:none;border:none;color:var(--faint);font-family:var(--mono);font-size:11px}
+  .rot-toggle:hover{color:var(--text)}
+  .rot-list{display:flex;flex-direction:column;gap:2px;padding-bottom:10px}
+  .rot-row{display:flex;align-items:center;gap:10px;padding:3px 0}
+  .rot-name{flex:0 0 200px;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rot-row.lag .rot-name{color:var(--muted)}
+  .rot-track{flex:1;position:relative;height:14px;background:rgba(255,255,255,.03);border-radius:3px;min-width:120px}
+  .rot-mid{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.14)}
+  .rot-bar{position:absolute;top:2px;bottom:2px;border-radius:2px;min-width:1px}
+  .rot-bar.pos{background:linear-gradient(90deg,rgba(127,176,105,.45),var(--good))}
+  .rot-bar.neg{background:linear-gradient(270deg,rgba(210,101,78,.45),var(--bad))}
+  .rot-ret{flex:0 0 58px;text-align:right;font-family:var(--mono);font-size:12px;font-weight:600}
+  .rot-ret.up{color:var(--good)}
+  .rot-ret.down{color:var(--bad)}
+  .rot-z{flex:0 0 62px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .rot-z.lead{color:var(--good)}
+  .rot-z.lag{color:var(--bad)}
+  .rot-meta{flex:0 0 78px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .rot-empty,.rot-nodata{font-family:var(--mono);font-size:11px;color:var(--faint);padding:4px 0 10px}
+  @media(max-width:700px){.rot-name{flex-basis:120px}.rot-meta{display:none}}
   /* chart modal */
   .modal[hidden]{display:none}
   .modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center}
@@ -289,6 +321,7 @@
 <div class="srcbar" id="srcbar"></div>
 <div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
 <div class="stats" id="stats"></div>
+<div class="rotation" id="rotation"></div>
 <div class="filterbar" id="filterbar"></div>
 
 <main><div class="grid" id="grid"></div></main>
@@ -630,7 +663,73 @@ function renderChart(){
 }
 
 /* ---------- render ---------- */
-function render(fromRemote){renderSrcBar();renderStats();renderFilter();renderTape();renderGrid();drawSparklines();wireEditForms();if(!fromRemote)scheduleWrite();}
+/* ---------- Sektör Rotasyonu (haftalık/aylık ayrışma; yalnızca görünüm, veriye yazmaz) ---------- */
+let rotationWin=localStorage.getItem("sm-rotwin")||"1A";
+let rotationOpen=localStorage.getItem("sm-rotopen")!=="0";
+const ROT_WINDOWS=[["1H",5],["1A",21]]; // işlem günü: ~1 hafta / ~1 ay
+function winReturn(closes,n){
+  if(!closes||closes.length<n+1)return null;
+  const last=closes[closes.length-1],prev=closes[closes.length-1-n];
+  if(!prev||isNaN(last)||isNaN(prev))return null;
+  return (last/prev-1)*100;
+}
+function sectorRotation(days){
+  const rows=state.sectors.map(sec=>{
+    const rets=[];
+    sec.companies.forEach(c=>{const q=quoteOf(c.ticker);if(q&&q.hist&&q.hist.c){const r=winReturn(q.hist.c,days);if(r!=null)rets.push(r);}});
+    if(!rets.length)return {sec,n:0,ret:null};
+    const mean=rets.reduce((a,b)=>a+b,0)/rets.length;        // eşit ağırlık
+    const up=rets.filter(r=>r>0).length;
+    return {sec,n:rets.length,ret:mean,breadth:Math.round(up/rets.length*100)};
+  });
+  const valid=rows.filter(r=>r.ret!=null);
+  const base=valid.length?valid.reduce((a,b)=>a+b.ret,0)/valid.length:0;  // kendi evren ortalaman
+  const sd=valid.length>1?Math.sqrt(valid.reduce((a,b)=>a+(b.ret-base)*(b.ret-base),0)/valid.length):0;
+  valid.forEach(r=>{r.rel=r.ret-base;r.z=sd?r.rel/sd:0;});               // sektörler-arası z-score
+  return {rows,base,sd};
+}
+function renderRotation(){
+  const el=document.getElementById("rotation");if(!el)return;
+  if(!priceData||!priceData.quotes){el.innerHTML="";return;}             // fiyat verisi yoksa gizle
+  const days=(ROT_WINDOWS.find(w=>w[0]===rotationWin)||ROT_WINDOWS[1])[1];
+  const {rows,base}=sectorRotation(days);
+  const valid=rows.filter(r=>r.ret!=null).sort((a,b)=>b.ret-a.ret);      // lider üstte
+  const winBtns=ROT_WINDOWS.map(w=>`<button class="rotwin ${rotationWin===w[0]?'on':''}" data-rw="${w[0]}">${w[0]==="1H"?"1 Hafta":"1 Ay"}</button>`).join("");
+  const head=`<div class="rot-head">
+    <span class="rot-title">Sektör Rotasyonu</span>
+    <span class="rot-win">${winBtns}</span>
+    <span class="rot-base">evren ort. <b>${base>=0?"+":""}${base.toFixed(1)}%</b></span>
+    <span class="rot-spacer"></span>
+    <button class="rot-toggle">${rotationOpen?"gizle ▾":"göster ▸"}</button>
+  </div>`;
+  let bodyHtml="";
+  if(rotationOpen){
+    if(!valid.length){
+      bodyHtml=`<div class="rot-empty">Rotasyon için hisse geçmişi yok — sektörlere hisse ekleyip fiyatları güncelle.</div>`;
+    }else{
+      const maxAbs=Math.max(0.01,...valid.map(r=>Math.abs(r.ret)));
+      bodyHtml=`<div class="rot-list">`+valid.map(r=>{
+        const pos=r.ret>=0,w=Math.abs(r.ret)/maxAbs*50;
+        const bar=pos?`left:50%;width:${w}%`:`left:${50-w}%;width:${w}%`;
+        const zc=r.z>=0.5?"lead":(r.z<=-0.5?"lag":"mid");
+        return `<div class="rot-row ${zc}">
+          <span class="rot-name" title="${esc(r.sec.name)}">${esc(r.sec.name)}</span>
+          <div class="rot-track"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${bar}"></div></div>
+          <span class="rot-ret ${pos?"up":"down"}">${pos?"+":""}${r.ret.toFixed(1)}%</span>
+          <span class="rot-z ${zc}" title="sektörler-arası z-score (kendi evrenine göre güç)">z ${r.z>=0?"+":""}${r.z.toFixed(2)}</span>
+          <span class="rot-meta" title="kaç hisse · artıda olan %">${r.n}h · ${r.breadth}%↑</span>
+        </div>`;
+      }).join("")+`</div>`;
+      const noData=rows.filter(r=>r.ret==null);
+      if(noData.length)bodyHtml+=`<div class="rot-nodata">Veri yetersiz: ${noData.map(r=>esc(r.sec.name)).join(" · ")}</div>`;
+    }
+  }
+  el.innerHTML=head+bodyHtml;
+  el.querySelectorAll(".rotwin").forEach(b=>b.onclick=()=>{rotationWin=b.dataset.rw;localStorage.setItem("sm-rotwin",rotationWin);renderRotation();});
+  const tg=el.querySelector(".rot-toggle");if(tg)tg.onclick=()=>{rotationOpen=!rotationOpen;localStorage.setItem("sm-rotopen",rotationOpen?"1":"0");renderRotation();};
+}
+
+function render(fromRemote){renderSrcBar();renderStats();renderRotation();renderFilter();renderTape();renderGrid();drawSparklines();wireEditForms();if(!fromRemote)scheduleWrite();}
 
 function renderFilter(){
   const el=document.getElementById("filterbar");
