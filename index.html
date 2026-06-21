@@ -1,5 +1,5 @@
 <meta charset="utf-8" />
-<title>Sektör Masası</title>
+<title>Prizma</title>
 <style>
   :root{
     --ground:#0E1318;
@@ -375,10 +375,10 @@
 
 <header class="bar">
   <div class="brand">
-    <span class="glyph">▦</span>
+    <span class="glyph">◆</span>
     <div>
-      <h1>Sektör Masası</h1>
-      <div class="sub">ABD piyasaları · tematik small-cap takibi</div>
+      <h1>Prizma</h1>
+      <div class="sub">ABD piyasaları · sektör &amp; tematik takip</div>
     </div>
   </div>
   <div class="tools">
@@ -399,14 +399,6 @@
 <div class="filterbar" id="filterbar"></div>
 
 <main><div class="grid" id="grid"></div></main>
-
-<footer>
-  <div class="disc">
-    Önerilen tickerlar tartışma başlangıcıdır — <b>yatırım tavsiyesi değildir.</b>
-    Eklemeden önce kendi iş-yapış analizini yap.
-    Ortak dosyaya bağlıyken aynı anda iki kişi yazarsa <b>son kaydeden geçerli olur</b>; pano açık panellerdeki değişikliği birkaç saniyede otomatik yeniler.
-  </div>
-</footer>
 
 <div class="modal" id="chartModal" hidden>
   <div class="modal-bg" id="modalBg"></div>
@@ -981,7 +973,7 @@ function renderStats(){
 function renderTape(){
   const cos=allCompanies();let items;
   if(cos.length){items=cos.map(c=>`<span class="tape-item"><b>${esc(c.ticker)}</b> <span class="nm">${esc(c.name||"")}</span></span>`);}
-  else{items=state.sectors.flatMap(s=>s.suggestions).slice(0,24).map(p=>`<span class="tape-item"><b>${esc(p.t)}</b> <span class="nm">${esc(p.n)}</span></span>`);}
+  else{items=[];}
   if(!items.length)items=['<span class="tape-item nm">şirket eklemeye başla…</span>'];
   document.getElementById("tape").innerHTML=items.join("")+items.join("");
 }
@@ -993,7 +985,7 @@ function renderGrid(){
   state.sectors.forEach((sec,i)=>{
     if(sv){if(!sec.companies.some(c=>isStarred(c.ticker)))return;}
     else if(ui.sectorFilter.size && !ui.sectorFilter.has(sec.id))return;
-    if(q){const hit=sec.name.toUpperCase().includes(q)||sec.companies.some(c=>(c.ticker+" "+(c.name||"")).toUpperCase().includes(q))||sec.suggestions.some(p=>(p.t+" "+p.n).toUpperCase().includes(q));if(!hit)return;}
+    if(q){const hit=sec.name.toUpperCase().includes(q)||sec.companies.some(c=>(c.ticker+" "+(c.name||"")).toUpperCase().includes(q));if(!hit)return;}
     grid.appendChild(cardEl(sec,i));shown++;
   });
   if(sv){  // yıldız görünümü: tüm sektörlerden yalnızca işaretliler
@@ -1015,7 +1007,6 @@ function renderGrid(){
 function cardEl(sec,i){
   const card=document.createElement("div");card.className="card";
   const num=String(i+1).padStart(2,"0");
-  const added=new Set(sec.companies.map(c=>c.ticker.toUpperCase()));
   const pes=sec.companies.map(c=>{const qq=(priceData&&priceData.quotes)?priceData.quotes[c.ticker.toUpperCase()]:null;return qq&&qq.pe;}).filter(v=>v&&v>0);
   const secStats=pes.length?`<div class="sec-stats">Medyan F/K <b>${median(pes).toFixed(1)}</b> <span class="dim">· ${pes.length} şirket</span></div>`:"";
   const zser=sectorZSeries(sec);                       // 252g doygunluk z serisi (+ tarihler)
@@ -1031,7 +1022,7 @@ function cardEl(sec,i){
     `<button class="sortdir" data-dirsec="${sec.id}" title="Yönü çevir (artan/azalan)" ${spref.key==="manual"?"disabled":""}>${spref.dir==="asc"?"↑":"↓"}</button></span>`:"";
   let comps=sortedCompanies(sec);
   if(ui.starView)comps=comps.filter(c=>isStarred(c.ticker));   // yıldız görünümünde sadece takiptekiler
-  let body=comps.length?comps.map(c=>coRow(sec,c)).join(""):'<div class="empty-note">Henüz şirket yok. Aşağıdaki önerilerden birine dokun ya da kendin ekle.</div>';
+  let body=comps.length?comps.map(c=>coRow(sec,c)).join(""):'<div class="empty-note">Henüz şirket yok — “+ Şirket ekle” ile başla.</div>';
   const formHtml=(ui.openForm&&ui.openForm.sectorId===sec.id&&!ui.openForm.companyId)?formEl(sec,null,ui.openForm.prefill):"";
   card.innerHTML=`
     <div class="card-head"><div class="ch-row"><div class="ch-main"><div class="card-top">
@@ -1041,16 +1032,12 @@ function cardEl(sec,i){
         <button class="iconbtn del" data-act="delSec" title="Sektörü sil">✕</button>
       </div></div>
       <p class="thesis">${esc(sec.thesis)}</p>${secStats}${sortCtl}</div>${zChart?`<div class="ch-chart">${zChart}</div>`:""}</div></div>
-    <div class="card-body">${body}${formHtml}${(formHtml||ui.starView)?"":'<button class="addco" data-act="addCo">+ Şirket ekle</button>'}</div>
-    ${ui.starView?"":`<div class="sugg"><div class="lbl">Öneriler — eklemek için dokun</div><div class="chips">
-      ${sec.suggestions.map(p=>`<button class="chip ${added.has(p.t.toUpperCase())?'added':''}" data-act="addSugg" data-t="${esc(p.t)}" data-n="${esc(p.n)}" title="${esc(p.n)}"><span class="plus">+</span>${esc(p.t)}</button>`).join("")}
-    </div></div>`}`;
+    <div class="card-body">${body}${formHtml}${(formHtml||ui.starView)?"":'<button class="addco" data-act="addCo">+ Şirket ekle</button>'}</div>`;
   if(zser){const sb=card.querySelector(".seczbig");if(sb)drawZAxis(sb,zser.z,zser.dates);}
   card.querySelector('[data-act="editSec"]').onclick=()=>editSector(sec.id);
   card.querySelector('[data-act="delSec"]').onclick=()=>delSector(sec.id);
   const addBtn=card.querySelector('[data-act="addCo"]');
   if(addBtn)addBtn.onclick=()=>{ui.openForm={sectorId:sec.id,companyId:null,prefill:null};render(true);wireForm(document,sec,null);};
-  card.querySelectorAll('[data-act="addSugg"]').forEach(b=>b.onclick=()=>{ui.openForm={sectorId:sec.id,companyId:null,prefill:{ticker:b.dataset.t,name:b.dataset.n}};render(true);wireForm(document,sec,null);});
   card.querySelectorAll('[data-act="editCo"]').forEach(b=>b.onclick=()=>{ui.openForm={sectorId:sec.id,companyId:b.dataset.id,prefill:null};render(true);});
   card.querySelectorAll('[data-act="delCo"]').forEach(b=>b.onclick=()=>{const s=state.sectors.find(s=>s.id===sec.id);s.companies=s.companies.filter(c=>c.id!==b.dataset.id);render();});
   card.querySelectorAll('[data-chart]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();openChart(b.dataset.chart);});
