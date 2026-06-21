@@ -370,6 +370,14 @@
   .rep-form .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
   .news-badge{font-family:var(--mono);font-size:10px;color:var(--accent-2);border:1px solid var(--line-cool);border-radius:4px;padding:0 5px;margin-left:6px;cursor:pointer}
   .news-badge:hover{border-color:var(--accent-2);color:var(--accent)}
+  /* yıldız / ortak takip */
+  .fchip.star.on{color:var(--accent);border-color:var(--accent);background:rgba(233,165,60,.08)}
+  .fchip.pin.on{color:var(--accent-2);border-color:var(--accent-2);background:rgba(111,162,206,.10)}
+  .iconbtn.star{font-size:14px}
+  .iconbtn.star.on{color:var(--accent)}
+  .iconbtn.pin{filter:grayscale(1);opacity:.45;font-size:11px}
+  .iconbtn.pin.on{filter:none;opacity:1}
+  .iconbtn.pin:hover{opacity:.9}
 </style>
 
 <header class="bar">
@@ -465,7 +473,7 @@ const SEED=[
 ];
 
 let state=loadLocal();
-let ui={openForm:null, sectorFilter:new Set()};
+let ui={openForm:null, sectorFilter:new Set(), starView:null}; // starView: null | 'personal' | 'shared'
 let fileHandle=null, pendingHandle=null, lastMod=0, writeTimer=null, pollTimer=null;
 let priceHandle=null, pendingPriceHandle=null, priceData=null, priceLastMod=0, pricePoll=null;
 
@@ -499,6 +507,7 @@ async function writeNow(){
 /* ================= GitHub canlı senkron ================= */
 const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
+let ghUser=localStorage.getItem("sm-gh-user")||"";  // kişisel listeyi cihazlar arası bağlamak için GitHub kimliği
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let newsData=null;  // haberler.json (salt-okunur, Actions üretir)
 function ghReady(){return !!ghToken;}
@@ -528,6 +537,11 @@ async function ghLoadNews(){
   const txt=await r.text();
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.news)newsData=d;}
   newsCommit=await ghLatestCommit(GH.newsFile);
+}
+async function ghLoadUser(){
+  try{const r=await fetch("https://api.github.com/user",{headers:ghHeaders(),cache:"no-store"});
+    if(r.ok){const j=await r.json();if(j&&j.login){ghUser=j.login;localStorage.setItem("sm-gh-user",ghUser);}}
+  }catch(e){}
 }
 async function ghLatestCommit(path){try{const r=await ghApi("/commits?path="+encodeURIComponent(path)+"&sha="+GH.branch+"&per_page=1&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});if(!r.ok)return null;const a=await r.json();return (a&&a[0])?a[0].sha:null;}catch(e){return null;}}
 async function ghSaveData(){
@@ -561,7 +575,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadUser();await ghLoadData();await ghLoadPrice();await ghLoadNews();startGitPoll();render(true);flash("GitHub'a bağlandı"+(ghUser?(" ("+ghUser+")"):""));}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -920,17 +934,35 @@ function renderFilter(){
   // stale id temizliği
   [...sel].forEach(id=>{if(!state.sectors.some(s=>s.id===id))sel.delete(id);});
   let html=`<span class="flabel">Göster</span>`;
-  html+=`<button class="fchip ${sel.size===0?'on':''}" data-all="1">Tümü<span class="fc">${state.sectors.length}</span></button>`;
-  html+=state.sectors.map(s=>`<button class="fchip ${sel.has(s.id)?'on':''}" data-id="${s.id}">${esc(s.name)}<span class="fc">${s.companies.length}</span></button>`).join("");
+  html+=`<button class="fchip star ${ui.starView==='personal'?'on':''}" data-star="personal" title="Yalnızca senin yıldızladıkların">⭐ Yıldızlılarım<span class="fc">${starCount('personal')}</span></button>`;
+  html+=`<button class="fchip pin ${ui.starView==='shared'?'on':''}" data-star="shared" title="Ekibin ortak takip listesi">📌 Ortak takip<span class="fc">${starCount('shared')}</span></button>`;
+  html+=`<button class="fchip ${(!ui.starView&&sel.size===0)?'on':''}" data-all="1">Tümü<span class="fc">${state.sectors.length}</span></button>`;
+  html+=state.sectors.map(s=>`<button class="fchip ${(!ui.starView&&sel.has(s.id))?'on':''}" data-id="${s.id}">${esc(s.name)}<span class="fc">${s.companies.length}</span></button>`).join("");
   el.innerHTML=html;
-  el.querySelector('[data-all]').onclick=()=>{ui.sectorFilter=new Set();render(true);};
+  el.querySelectorAll('[data-star]').forEach(b=>b.onclick=()=>{const k=b.dataset.star;ui.starView=(ui.starView===k)?null:k;ui.sectorFilter=new Set();render(true);});
+  el.querySelector('[data-all]').onclick=()=>{ui.starView=null;ui.sectorFilter=new Set();render(true);};
   el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{
-    const id=b.dataset.id;
+    const id=b.dataset.id;ui.starView=null;
     if(sel.has(id))sel.delete(id);else sel.add(id);
     render(true);
   });
 }
 function allCompanies(){return state.sectors.flatMap(s=>s.companies);}
+
+/* ---------- Yıldız / takip (kişisel = kullanıcıya, ortak = herkese) ---------- */
+function myStarKey(){return ghUser||"_local";}
+function sharedStarsArr(){if(!state.sharedStars)state.sharedStars=[];return state.sharedStars;}
+function personalStarsArr(){if(!state.personalStars)state.personalStars={};const k=myStarKey();if(!state.personalStars[k])state.personalStars[k]=[];return state.personalStars[k];}
+function isStarred(tk,kind){tk=(tk||"").toUpperCase();
+  if(kind==='shared')return !!(state.sharedStars&&state.sharedStars.includes(tk));
+  const k=myStarKey();return !!(state.personalStars&&state.personalStars[k]&&state.personalStars[k].includes(tk));}
+function starCount(kind){if(kind==='shared')return (state.sharedStars||[]).length;const k=myStarKey();return ((state.personalStars&&state.personalStars[k])||[]).length;}
+function toggleStar(tk,kind){
+  tk=(tk||"").toUpperCase();const arr=kind==='shared'?sharedStarsArr():personalStarsArr();const i=arr.indexOf(tk);
+  if(i>=0)arr.splice(i,1);else arr.push(tk);
+  render();
+  flash(kind==='shared'?(i>=0?"Ortak takipten çıkarıldı":"Ortak takibe eklendi"):(i>=0?"Yıldız kaldırıldı":"Yıldızlandı"));
+}
 
 function renderSrcBar(){
   const el=document.getElementById("srcbar");
@@ -973,12 +1005,21 @@ function renderGrid(){
   const q=(document.getElementById("search").value||"").trim().toUpperCase();
   const grid=document.getElementById("grid");grid.innerHTML="";
   let shown=0;
+  const sv=ui.starView;
   state.sectors.forEach((sec,i)=>{
-    if(ui.sectorFilter.size && !ui.sectorFilter.has(sec.id))return;
+    if(sv){if(!sec.companies.some(c=>isStarred(c.ticker,sv)))return;}
+    else if(ui.sectorFilter.size && !ui.sectorFilter.has(sec.id))return;
     if(q){const hit=sec.name.toUpperCase().includes(q)||sec.companies.some(c=>(c.ticker+" "+(c.name||"")).toUpperCase().includes(q))||sec.suggestions.some(p=>(p.t+" "+p.n).toUpperCase().includes(q));if(!hit)return;}
     grid.appendChild(cardEl(sec,i));shown++;
   });
-  // Filtre aktifken kartları ekran genişliğine yay; Tümü'de normal düzen.
+  if(sv){  // yıldız görünümü: tüm sektörlerden yalnızca işaretliler
+    grid.style.gridTemplateColumns="";
+    if(!shown){const e=document.createElement("div");e.className="empty-note";e.style.padding="22px 4px";
+      e.textContent=sv==='personal'?"Henüz yıldızladığın şirket yok — bir şirketin yanındaki ☆'a dokun.":"Ortak takipte şirket yok — bir şirketin yanındaki 📌'a dokun.";
+      grid.appendChild(e);}
+    return;
+  }
+  // Sektör filtresi aktifken kartları ekran genişliğine yay; Tümü'de normal düzen.
   if(ui.sectorFilter.size){
     grid.style.gridTemplateColumns=`repeat(${Math.min(shown||1,3)}, minmax(0,1fr))`;
   }else{
@@ -1001,10 +1042,12 @@ function cardEl(sec,i){
   const zW=zFocus?320:160, zH=zFocus?150:100;                       // her durumda sağda, eksenli
   const zChart=zser?`<div class="seczbig-wrap"><div class="seczbig-head">252g doygunluk z <span class="secz-val ${zCls}">${zValTxt}</span></div><canvas class="seczbig" width="${zW}" height="${zH}"></canvas></div>`:"";
   const spref=sortPref[sec.id]||{key:"manual",dir:"desc"};
-  const sortCtl=sec.companies.length>1?`<span class="sortbar"><span class="slabel">Sırala</span>`+
+  const sortCtl=(!ui.starView&&sec.companies.length>1)?`<span class="sortbar"><span class="slabel">Sırala</span>`+
     `<select class="sortsel" data-sortsec="${sec.id}">${SORT_KEYS.map(k=>`<option value="${k[0]}" ${spref.key===k[0]?"selected":""}>${k[1]}</option>`).join("")}</select>`+
     `<button class="sortdir" data-dirsec="${sec.id}" title="Yönü çevir (artan/azalan)" ${spref.key==="manual"?"disabled":""}>${spref.dir==="asc"?"↑":"↓"}</button></span>`:"";
-  let body=sec.companies.length?sortedCompanies(sec).map(c=>coRow(sec,c)).join(""):'<div class="empty-note">Henüz şirket yok. Aşağıdaki önerilerden birine dokun ya da kendin ekle.</div>';
+  let comps=sortedCompanies(sec);
+  if(ui.starView)comps=comps.filter(c=>isStarred(c.ticker,ui.starView));   // yıldız görünümünde sadece işaretliler
+  let body=comps.length?comps.map(c=>coRow(sec,c)).join(""):'<div class="empty-note">Henüz şirket yok. Aşağıdaki önerilerden birine dokun ya da kendin ekle.</div>';
   const formHtml=(ui.openForm&&ui.openForm.sectorId===sec.id&&!ui.openForm.companyId)?formEl(sec,null,ui.openForm.prefill):"";
   card.innerHTML=`
     <div class="card-head"><div class="ch-row"><div class="ch-main"><div class="card-top">
@@ -1014,10 +1057,10 @@ function cardEl(sec,i){
         <button class="iconbtn del" data-act="delSec" title="Sektörü sil">✕</button>
       </div></div>
       <p class="thesis">${esc(sec.thesis)}</p>${secStats}${sortCtl}</div>${zChart?`<div class="ch-chart">${zChart}</div>`:""}</div></div>
-    <div class="card-body">${body}${formHtml}${formHtml?"":'<button class="addco" data-act="addCo">+ Şirket ekle</button>'}</div>
-    <div class="sugg"><div class="lbl">Öneriler — eklemek için dokun</div><div class="chips">
+    <div class="card-body">${body}${formHtml}${(formHtml||ui.starView)?"":'<button class="addco" data-act="addCo">+ Şirket ekle</button>'}</div>
+    ${ui.starView?"":`<div class="sugg"><div class="lbl">Öneriler — eklemek için dokun</div><div class="chips">
       ${sec.suggestions.map(p=>`<button class="chip ${added.has(p.t.toUpperCase())?'added':''}" data-act="addSugg" data-t="${esc(p.t)}" data-n="${esc(p.n)}" title="${esc(p.n)}"><span class="plus">+</span>${esc(p.t)}</button>`).join("")}
-    </div></div>`;
+    </div></div>`}`;
   if(zser){const sb=card.querySelector(".seczbig");if(sb)drawZAxis(sb,zser.z,zser.dates);}
   card.querySelector('[data-act="editSec"]').onclick=()=>editSector(sec.id);
   card.querySelector('[data-act="delSec"]').onclick=()=>delSector(sec.id);
@@ -1028,6 +1071,7 @@ function cardEl(sec,i){
   card.querySelectorAll('[data-act="delCo"]').forEach(b=>b.onclick=()=>{const s=state.sectors.find(s=>s.id===sec.id);s.companies=s.companies.filter(c=>c.id!==b.dataset.id);render();});
   card.querySelectorAll('[data-chart]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();openChart(b.dataset.chart);});
   card.querySelectorAll('[data-news]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();openNews(b.dataset.news);});
+  card.querySelectorAll('[data-star]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();toggleStar(b.dataset.tk,b.dataset.star);});
   const sortSel=card.querySelector('.sortsel');
   if(sortSel)sortSel.onchange=()=>{const k=sortSel.value;if(k==="manual")delete sortPref[sec.id];else sortPref[sec.id]={key:k,dir:sortDefaultDir(k)};saveSort();render(true);};
   const sortDir=card.querySelector('.sortdir');
@@ -1055,6 +1099,9 @@ function coRow(sec,c){
   const mcTag=(q&&q.marketCap)?`<span class="mc-tag" title="Piyasa değeri">${fmtMC(q.marketCap)}</span>`:"";
   const ncnt=newsCountFor(c.ticker);
   const nb=ncnt?`<span class="news-badge" data-news="${esc(c.ticker)}" title="${ncnt} haber — aç">📰 ${ncnt}</span>`:"";
+  const sP=isStarred(c.ticker,'personal'),sS=isStarred(c.ticker,'shared');
+  const starBtns=`<button class="iconbtn star ${sP?'on':''}" data-star="personal" data-tk="${esc(c.ticker)}" title="Kişisel yıldız (sadece sen)">${sP?'★':'☆'}</button>`+
+    `<button class="iconbtn pin ${sS?'on':''}" data-star="shared" data-tk="${esc(c.ticker)}" title="Ortak takip (ekip)">📌</button>`;
   let px="";
   if(q&&q.price!=null){
     const chg=q.changePct;
@@ -1074,7 +1121,7 @@ function coRow(sec,c){
     if(p.length)metrics=`<div class="metrics">${p.join("")}</div>`;
   }
   const convTools=`<span class="conv" title="Konviksiyon ${c.conv||0}/3">${dots}</span>
-    <span class="co-tools"><button class="iconbtn" data-act="editCo" data-id="${c.id}" title="Düzenle">✎</button>
+    <span class="co-tools">${starBtns}<button class="iconbtn" data-act="editCo" data-id="${c.id}" title="Düzenle">✎</button>
     <button class="iconbtn del" data-act="delCo" data-id="${c.id}" title="Sil">✕</button></span>`;
   const nameLine=`${esc(c.name||"—")} ${sizeTag}${mcTag}`;
   // Tek sektör seçili: solda finansallar, ORTADA yazı, sağda eksenli grafik (aralık kutulu)
@@ -1107,7 +1154,7 @@ function coRow(sec,c){
   return `<div class="co">
     <div class="co-id"><span class="${tkrCls}"${tkrAttr}>${esc(c.ticker)}</span>${px}${metrics}${spark}</div>
     <div class="co-right"><span class="conv" title="Konviksiyon ${c.conv||0}/3">${dots}</span>
-    <span class="co-tools"><button class="iconbtn" data-act="editCo" data-id="${c.id}" title="Düzenle">✎</button>
+    <span class="co-tools">${starBtns}<button class="iconbtn" data-act="editCo" data-id="${c.id}" title="Düzenle">✎</button>
     <button class="iconbtn del" data-act="delCo" data-id="${c.id}" title="Sil">✕</button></span></div>
     <div class="meta"><div class="nm">${esc(c.name||"—")} ${sizeTag}${mcTag}${nb}</div>${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div></div>`;
 }
@@ -1322,7 +1369,7 @@ async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();startGitPoll();render(true);}
+    try{await ghLoadUser();await ghLoadData();await ghLoadPrice();await ghLoadNews();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
