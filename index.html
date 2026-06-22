@@ -43,14 +43,25 @@
     position:sticky;top:0;z-index:30;
     backdrop-filter:blur(8px);
   }
-  .brand{display:flex;align-items:baseline;gap:12px;margin-right:auto}
+  .brand{display:flex;align-items:baseline;gap:12px}
   .glyph{
     font-family:var(--mono);color:var(--accent);font-size:20px;letter-spacing:-1px;
     text-shadow:0 0 14px rgba(233,165,60,.45);
   }
   .brand h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.14em;text-transform:uppercase}
   .brand .sub{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em}
-  .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
+  /* ---------- risk iştahı rozeti (rejim.json) ---------- */
+  .riskbadge{
+    display:flex;align-items:center;gap:9px;
+    padding:6px 13px;border-radius:9px;border:1px solid var(--line-cool);
+    background:var(--surface);font-family:var(--mono);
+  }
+  .riskbadge .rb-dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .riskbadge .rb-lbl{color:var(--faint);font-size:9.5px;letter-spacing:.14em}
+  .riskbadge .rb-state{font-size:13px;font-weight:700;letter-spacing:.02em}
+  .riskbadge .rb-score{font-size:13px;font-weight:600;color:var(--text)}
+  .riskbadge .rb-date{font-size:11px;color:var(--muted)}
   .search{
     display:flex;align-items:center;gap:7px;background:var(--surface);
     border:1px solid var(--line-cool);border-radius:7px;padding:7px 10px;
@@ -381,6 +392,7 @@
       <div class="sub">ABD piyasaları · sektör &amp; tematik takip</div>
     </div>
   </div>
+  <div class="riskbadge" id="riskBadge" hidden></div>
   <div class="tools">
     <div class="search"><span>⌕</span><input id="search" type="text" placeholder="Ticker veya sektör ara" aria-label="Ara" /></div>
     <button class="btn primary" id="newsBtn" title="Haber akışı">📰 Haberler</button>
@@ -949,7 +961,24 @@ function renderRotation(){
   const tg=el.querySelector(".rot-toggle");if(tg)tg.onclick=()=>{rotationOpen=!rotationOpen;localStorage.setItem("sm-rotopen",rotationOpen?"1":"0");renderRotation();};
 }
 
-function render(fromRemote){renderSrcBar();renderStats();renderRotation();renderFilter();renderTape();renderGrid();drawSparklines();wireEditForms();
+const REGIME_NAMES_TR=["Risk-On","Nötr","Risk-Off"];
+function renderRiskBadge(){
+  const el=document.getElementById("riskBadge");if(!el)return;
+  if(!regimeData||regimeData.last_state==null){el.hidden=true;el.innerHTML="";return;}
+  const st=regimeData.last_state,col=REGIME_COL[st];
+  const score=(regimeData.last_score>=0?"+":"")+Number(regimeData.last_score).toFixed(2);
+  const d=regimeData.last_date||"",dlbl=d?d.slice(8,10)+"."+d.slice(5,7):"";
+  let upd="";if(regimeData.updated){try{upd=new Date(regimeData.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}
+  el.title=`Risk İştahı — ${REGIME_NAMES_TR[st]}\nSkor ${score} (${d})\nEşikler: Risk-On/Nötr ${regimeData.thr_low}  ·  Nötr/Risk-Off ${regimeData.thr_high}`+(upd?`\nGüncellendi: ${upd}`:"");
+  el.style.borderColor=hexA(col,.5);
+  el.innerHTML=`<span class="rb-dot" style="background:${col};box-shadow:0 0 8px ${hexA(col,.7)}"></span>`+
+    `<span class="rb-lbl">RİSK İŞTAHI</span>`+
+    `<span class="rb-state" style="color:${col}">${REGIME_NAMES_TR[st]}</span>`+
+    `<span class="rb-score">${score}</span>`+
+    `<span class="rb-date">${dlbl}</span>`;
+  el.hidden=false;
+}
+function render(fromRemote){renderSrcBar();renderRiskBadge();renderStats();renderRotation();renderFilter();renderTape();renderGrid();drawSparklines();wireEditForms();
   if(!document.getElementById("newsModal").hidden)renderNews();
   if(!document.getElementById("reportsModal").hidden&&!reportForm)renderReports();
   if(!fromRemote)scheduleWrite();}
