@@ -490,10 +490,11 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let newsData=null;  // haberler.json (salt-okunur, Actions üretir)
+let regimeData=null, regimeCommit=null;  // rejim.json (Risk İştahı rejim bantları, Actions üretir)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -522,6 +523,13 @@ async function ghLoadNews(){
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.news)newsData=d;}
   newsCommit=await ghLatestCommit(GH.newsFile);
 }
+async function ghLoadRegime(){
+  const r=await ghApi("/contents/"+GH.regimeFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.segments)regimeData=d;}
+  regimeCommit=await ghLatestCommit(GH.regimeFile);
+}
 async function ghLatestCommit(path){try{const r=await ghApi("/commits?path="+encodeURIComponent(path)+"&sha="+GH.branch+"&per_page=1&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});if(!r.ok)return null;const a=await r.json();return (a&&a[0])?a[0].sha:null;}catch(e){return null;}}
 async function ghSaveData(){
   if(!ghReady())return;
@@ -544,6 +552,8 @@ function startGitPoll(){
       if(pc&&pc!==priceCommit){await ghLoadPrice();render(true);flash("Piyasa verisi güncellendi");}
       const nc=await ghLatestCommit(GH.newsFile);
       if(nc&&nc!==newsCommit){await ghLoadNews();render(true);flash("Haberler güncellendi");}
+      const rc=await ghLatestCommit(GH.regimeFile);
+      if(rc&&rc!==regimeCommit){await ghLoadRegime();render(true);flash("Risk rejimi güncellendi");}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -554,7 +564,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -662,10 +672,39 @@ function sortedCompanies(sec){
 function median(a){const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
 function hexA(h,a){const n=parseInt(h.slice(1),16);return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
 function histOf(t){const q=(priceData&&priceData.quotes)?priceData.quotes[(t||"").toUpperCase()]:null;return (q&&q.hist&&q.hist.c&&q.hist.c.length>1)?q.hist:null;}
+/* ---------- Risk İştahı rejim bantları (rejim.json) ---------- */
+// 's': 0 Risk-On (yeşil) · 1 Nötr (amber) · 2 Risk-Off (kırmızı)
+const REGIME_COL=["#2E8B57","#E8A33D","#C0392B"];
+// Bir tarihin rejimi: o tarihten küçük-eşit son segmentin değeri.
+function regimeAt(dateStr){
+  if(!regimeData||!regimeData.segments||!regimeData.segments.length)return null;
+  const segs=regimeData.segments;let s=null;
+  for(let i=0;i<segs.length;i++){if(segs[i].d<=dateStr)s=segs[i].s;else break;}
+  return s;
+}
+// Ardışık aynı rejim günlerini tek dikey bant olarak doldur (çizginin arkasına).
+function drawRegimeBands(ctx,dates,X,top,bottom){
+  if(!regimeData||!dates||!dates.length)return;
+  let runStart=0,runState=regimeAt(dates[0]);
+  for(let i=1;i<=dates.length;i++){
+    const st=i<dates.length?regimeAt(dates[i]):null;
+    if(i===dates.length||st!==runState){
+      if(runState!=null){
+        const x0=X(runStart),x1=X(Math.min(i,dates.length-1));
+        ctx.fillStyle=hexA(REGIME_COL[runState],.13);
+        ctx.fillRect(x0,top,(x1-x0)||1,bottom-top);
+      }
+      runStart=i;runState=st;
+    }
+  }
+}
 function drawSeries(cv,closes,opts){
   opts=opts||{};const ctx=cv.getContext("2d");const W=cv.width,H=cv.height;
   ctx.clearRect(0,0,W,H);
   if(!closes||closes.length<2)return;
+  const pad0=opts.pad||0;
+  if(opts.dates&&opts.dates.length===closes.length)
+    drawRegimeBands(ctx,opts.dates,i=>pad0+(i/(closes.length-1))*(W-2*pad0),0,H);
   const pad=opts.pad||0;
   const mn=Math.min(...closes),mx=Math.max(...closes),rng=(mx-mn)||1,n=closes.length;
   const X=i=>pad+(i/(n-1))*(W-2*pad);
@@ -698,6 +737,8 @@ function drawAxisChart(cv,hist,range){
   const Y=v=>padT+(1-(v-mn)/rng)*(H-padT-padB);
   const up=closes[n-1]>=closes[0],col=up?C_GOOD:C_BAD;
   ctx.font="9px ui-monospace,Consolas,monospace";
+  // Rejim bantları (her şeyin arkasında)
+  drawRegimeBands(ctx,dates,X,padT,H-padB);
   // Y ekseni: yatay çizgiler + fiyat seviyeleri
   ctx.textBaseline="middle";ctx.textAlign="right";
   const yl=4;
@@ -749,11 +790,15 @@ function renderChart(){
     <div class="mh-px">$${Number(q.price).toFixed(2)} <span class="chg ${chg>0?'up':(chg<0?'down':'')}">${chg>0?'+':''}${chg!=null?chg.toFixed(2):'0.00'}%</span></div>`;
   document.getElementById("modalRange").innerHTML=RANGES.map(r=>`<button class="rbtn ${chartState.range===r[0]?'on':''}" data-r="${r[0]}">${r[0]}</button>`).join("");
   document.querySelectorAll("#modalRange .rbtn").forEach(b=>b.onclick=()=>{chartState.range=b.dataset.r;renderChart();});
-  drawSeries(document.getElementById("chartCanvas"),closes,{fill:true,dot:true,lw:1.8,pad:8,color:up?C_GOOD:C_BAD});
+  drawSeries(document.getElementById("chartCanvas"),closes,{fill:true,dot:true,lw:1.8,pad:8,color:up?C_GOOD:C_BAD,dates:dates});
   const cc=up?"up":"down";
+  const regimeLegend=regimeData?`<span class="mf dim" style="margin-left:auto">Rejim:
+    <b style="color:${REGIME_COL[0]}">●</b> Risk-On
+    <b style="color:${REGIME_COL[1]}">●</b> Nötr
+    <b style="color:${REGIME_COL[2]}">●</b> Risk-Off</span>`:"";
   document.getElementById("modalFoot").innerHTML=`<span class="mf ${cc}">${chartState.range} getirisi <b>${ret>0?'+':''}${ret.toFixed(1)}%</b></span>
     <span class="mf">En düşük <b>$${mn.toFixed(2)}</b></span><span class="mf">En yüksek <b>$${mx.toFixed(2)}</b></span>
-    <span class="mf dim">${esc(dates[0])} → ${esc(dates[dates.length-1])}</span>`;
+    <span class="mf dim">${esc(dates[0])} → ${esc(dates[dates.length-1])}</span>${regimeLegend}`;
 }
 
 /* ---------- render ---------- */
@@ -1339,7 +1384,7 @@ async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
