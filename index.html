@@ -87,6 +87,14 @@
   .btn.ghost{background:none;border-color:transparent;color:var(--muted)}
   .btn.ghost:hover{color:var(--text);background:var(--surface)}
   .btn.sm{padding:6px 9px;font-size:11.5px}
+  .btn.danger{border-color:var(--bad);color:var(--bad);background:rgba(210,101,78,.12)}
+  .btn.danger:hover{background:rgba(210,101,78,.2);border-color:var(--bad)}
+  .btn.ok{border-color:var(--good);color:var(--good)}
+  .btn.ok:hover{background:rgba(127,176,105,.14);border-color:var(--good)}
+  .btn.warn{border-color:var(--accent);color:var(--accent);background:rgba(233,165,60,.1)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+  .btn.danger{animation:pulse 1.8s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){.btn.danger{animation:none}}
 
   /* ---------- data-source bar ---------- */
   .srcbar{
@@ -521,6 +529,7 @@ async function writeNow(){
 const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
+let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
 let newsData=null;  // haberler.json (salt-okunur, Actions üretir)
 let regimeData=null, regimeCommit=null;  // rejim.json (Risk İştahı rejim bantları, Actions üretir)
 let regimeChartUrl=null, regimeChartCommit=null;  // rejim_spx.png (rozete tıklayınca açılan grafik)
@@ -529,14 +538,46 @@ function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
 function b64decUtf8(b){const bin=atob((b||"").replace(/\s/g,""));const u=Uint8Array.from(bin,c=>c.charCodeAt(0));return new TextDecoder().decode(u);}
 function ghApi(path,opts){return fetch("https://api.github.com/repos/"+GH.user+"/"+GH.repo+path,opts);}
-async function ghLoadData(){
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function _byId(a){const m={};(a||[]).forEach(x=>{m[x.id]=x;});return m;}
+// 3-yönlü birleştirme: base=son senkron, mine=benim halim, remote=GitHub'taki güncel. Ekleme kaybolmaz.
+function mergeData(base, mine, remote){
+  base=base||{sectors:[]}; remote=remote||{sectors:[]}; mine=mine||{sectors:[]};
+  const bS=_byId(base.sectors), rS=_byId(remote.sectors);
+  function mergeSector(id){
+    const b=bS[id], m=_byId(mine.sectors)[id], r=rS[id];
+    const bC=_byId(b?b.companies:[]), mC=_byId(m?m.companies:[]), rC=_byId(r?r.companies:[]);
+    const order=[], seen=new Set();
+    (m?m.companies:[]).forEach(c=>{if(!seen.has(c.id)){seen.add(c.id);order.push(c.id);}});
+    (r?r.companies:[]).forEach(c=>{if(!seen.has(c.id)){seen.add(c.id);order.push(c.id);}});
+    const comps=[];
+    order.forEach(cid=>{const inB=!!bC[cid],inM=!!mC[cid],inR=!!rC[cid];
+      if(inM){comps.push(mC[cid]);} else if(inB&&inR){} else if(inR){comps.push(rC[cid]);}});
+    const src=m||r||b||{};
+    return {id, name:(m?m.name:(r?r.name:src.name)), thesis:(m?m.thesis:(r?r.thesis:src.thesis)),
+      suggestions:((m&&m.suggestions)?m.suggestions:(r?r.suggestions:(src.suggestions||[]))), companies:comps,
+      ...(m?Object.fromEntries(Object.entries(m).filter(([k])=>!["id","name","thesis","suggestions","companies"].includes(k))):{})};
+  }
+  const out=[], done=new Set();
+  (mine.sectors||[]).forEach(s=>{if(!done.has(s.id)){done.add(s.id);out.push(mergeSector(s.id));}});
+  (remote.sectors||[]).forEach(s=>{if(done.has(s.id))return; if(bS[s.id])return; done.add(s.id);out.push(mergeSector(s.id));});
+  const res={seq:Math.max(mine.seq||0,remote.seq||0,base.seq||0), sectors:out};
+  Object.keys(mine).forEach(k=>{if(k!=="seq"&&k!=="sectors"&&!(k in res))res[k]=mine[k];});
+  return res;
+}
+async function ghFetchData(){
   const r=await ghApi("/contents/"+GH.dataFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});
-  if(r.status===404){dataSha=null;return;}
+  if(r.status===404)return {data:null,sha:null};
   if(r.status===401)throw new Error("Token geçersiz (401)");
   if(!r.ok)throw new Error("Veri okunamadı ("+r.status+")");
-  const j=await r.json();dataSha=j.sha;
+  const j=await r.json();
   const txt=b64decUtf8(j.content);
-  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.sectors){state=d;saveLocal();}}
+  return {data:(txt.trim()?JSON.parse(txt):null), sha:j.sha};
+}
+async function ghLoadData(){
+  const got=await ghFetchData();
+  dataSha=got.sha;
+  if(got.data&&got.data.sectors){state=got.data;baseState=clone(state);saveLocal();}
 }
 async function ghLoadPrice(){
   const r=await ghApi("/contents/"+GH.priceFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
@@ -544,6 +585,7 @@ async function ghLoadPrice(){
   const txt=await r.text();
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.quotes){priceData=d;let lbl="yüklendi";if(d.updated){try{lbl=new Date(d.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}priceData.updatedLabel=lbl;}}
   priceCommit=await ghLatestCommit(GH.priceFile);
+  updating=false;
 }
 async function ghLoadNews(){
   const r=await ghApi("/contents/"+GH.newsFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
@@ -569,22 +611,35 @@ async function ghLoadRegimeChart(){
 }
 async function ghLatestCommit(path){try{const r=await ghApi("/commits?path="+encodeURIComponent(path)+"&sha="+GH.branch+"&per_page=1&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});if(!r.ok)return null;const a=await r.json();return (a&&a[0])?a[0].sha:null;}catch(e){return null;}}
 async function ghSaveData(){
-  if(!ghReady())return;
-  const mk=()=>({message:"pano güncelleme",content:b64encUtf8(JSON.stringify(state,null,2)),branch:GH.branch,sha:dataSha||undefined});
-  let r=await ghApi("/contents/"+GH.dataFile,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(mk())});
-  if(r.status===409||r.status===422){await ghLoadData();r=await ghApi("/contents/"+GH.dataFile,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(mk())});}
-  if(!r.ok){flash("GitHub'a yazılamadı ("+r.status+")");return;}
-  const j=await r.json();if(j.content&&j.content.sha)dataSha=j.content.sha;
+  if(!ghReady()){pendingWrite=false;return;}
+  try{
+    const got=await ghFetchData();
+    if(got.data&&got.data.sectors){state=mergeData(baseState,state,got.data);}
+    const body={message:"pano güncelleme",content:b64encUtf8(JSON.stringify(state,null,2)),branch:GH.branch};
+    if(got.sha)body.sha=got.sha;
+    let r=await ghApi("/contents/"+GH.dataFile,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)});
+    if(r.status===409||r.status===422){
+      const g2=await ghFetchData();
+      if(g2.data&&g2.data.sectors){state=mergeData(baseState,state,g2.data);}
+      body.content=b64encUtf8(JSON.stringify(state,null,2));
+      if(g2.sha){body.sha=g2.sha;}else{delete body.sha;}
+      r=await ghApi("/contents/"+GH.dataFile,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)});
+    }
+    if(!r.ok){flash("GitHub'a yazılamadı ("+r.status+")");return;}
+    const j=await r.json();if(j.content&&j.content.sha)dataSha=j.content.sha;
+    baseState=clone(state);saveLocal();render(true);
+  }catch(e){flash("Yazma hatası: "+e.message);}
+  finally{pendingWrite=false;}
 }
-function scheduleWrite(){ saveLocal(); if(!ghReady())return; clearTimeout(ghWriteTimer); ghWriteTimer=setTimeout(()=>ghSaveData().catch(e=>flash("Yazma hatası: "+e.message)),700); }
+function scheduleWrite(){ saveLocal(); if(!ghReady())return; pendingWrite=true; clearTimeout(ghWriteTimer); ghWriteTimer=setTimeout(()=>ghSaveData(),700); }
 function startGitPoll(){
   if(ghPollTimer)clearInterval(ghPollTimer);
   ghPollTimer=setInterval(async()=>{
-    if(!ghReady()||ui.openForm||ghBusy)return;
+    if(!ghReady()||ui.openForm||ghBusy||pendingWrite)return;
     ghBusy=true;
     try{
-      const r=await ghApi("/contents/"+GH.dataFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});
-      if(r.ok){const j=await r.json();if(j.sha!==dataSha){dataSha=j.sha;const txt=b64decUtf8(j.content);const d=JSON.parse(txt);if(d&&d.sectors){state=d;saveLocal();render(true);flash("Ortak veri güncellendi");}}}
+      const got=await ghFetchData();
+      if(got.sha&&got.sha!==dataSha){dataSha=got.sha;if(got.data&&got.data.sectors){state=got.data;baseState=clone(state);saveLocal();render(true);flash("Ortak veri güncellendi");}}
       const pc=await ghLatestCommit(GH.priceFile);
       if(pc&&pc!==priceCommit){await ghLoadPrice();render(true);flash("Piyasa verisi güncellendi");}
       const nc=await ghLatestCommit(GH.newsFile);
@@ -595,6 +650,27 @@ function startGitPoll(){
       if(rcc&&rcc!==regimeChartCommit){await ghLoadRegimeChart();if(!document.getElementById("regimeModal").hidden)renderRegimeModal();}
     }catch(e){}finally{ghBusy=false;}
   },25000);
+}
+function staleTickers(){
+  if(!priceData||!priceData.quotes)return null;
+  const q=priceData.quotes,miss=[];
+  state.sectors.forEach(s=>s.companies.forEach(c=>{const t=(c.ticker||"").toUpperCase();if(t&&!q[t])miss.push(t);}));
+  return miss;
+}
+async function dispatchUpdate(){
+  if(!ghReady()){flash("Önce token gir");return;}
+  flash("Güncelleme başlatılıyor…");
+  try{
+    const r=await ghApi("/actions/workflows/fiyat-guncelle.yml/dispatches",{method:"POST",headers:ghHeaders(),body:JSON.stringify({ref:GH.branch})});
+    if(r.status===204){
+      updating=true;renderSrcBar();
+      clearTimeout(updTimer);updTimer=setTimeout(()=>{updating=false;renderSrcBar();},360000);
+      flash("☁️ Bulutta güncelleme başladı — ~2-3 dk sonra veriler otomatik gelecek.");
+    }
+    else if(r.status===404){flash("Workflow bulunamadı — otomasyon repoda yok.");}
+    else if(r.status===403){flash("Token'da 'Actions' izni yok.");}
+    else{flash("Başlatılamadı ("+r.status+")");}
+  }catch(e){flash("Hata: "+e.message);}
 }
 function setToken(){
   const t=prompt("GitHub fine-grained token'ını yapıştır (github_pat_...).\nSadece bu tarayıcıda saklanır:", "");
@@ -1051,7 +1127,14 @@ function renderSrcBar(){
   if(ghReady()){
     const pl=priceData?`<span class="srcsep"></span><span class="pxstat"><span class="sdot on"></span>📈 ${esc(priceData.updatedLabel||"")}</span>`:"";
     left=`<span class="sdot on"></span><span class="path">GitHub'a bağlı: <b>${esc(GH.user)}/${esc(GH.repo)}</b></span>${pl}`;
-    right=`<button class="btn sm" id="ghRefresh" title="Şimdi yenile">↻ Yenile</button>
+    let uCls,uLbl,uTitle;
+    if(updating){uCls="warn";uLbl="⏳ Güncelleniyor…";uTitle="Bulutta çalışıyor (~2-3 dk)";}
+    else{const miss=staleTickers();
+      if(miss===null){uCls="primary";uLbl="🔄 Verileri güncelle";uTitle="Piyasa verilerini güncelle";}
+      else if(miss.length>0){uCls="danger";uLbl="🔄 Verileri güncelle ("+miss.length+")";uTitle="Verisi eksik: "+miss.join(", ")+" — güncellemek için tıkla";}
+      else{uCls="ok";uLbl="✓ Veriler güncel";uTitle="Tüm hisselerin verisi mevcut. Yine de güncellemek için tıkla.";}}
+    right=`<button class="btn ${uCls} sm" id="ghUpdate" title="${esc(uTitle)}">${uLbl}</button>
+           <button class="btn sm" id="ghRefresh" title="Şimdi yenile">↻ Yenile</button>
            <button class="btn ghost sm" id="ghTokenBtn" title="Token'ı değiştir/kaldır">🔑 Token</button>`;
   }else{
     left=`<span class="sdot warn"></span><span class="path">GitHub'a bağlı değil — token girilmesi gerekiyor</span>`;
@@ -1059,6 +1142,7 @@ function renderSrcBar(){
   }
   el.innerHTML=`<div class="status">${left}</div><span class="spacer"></span>${right}`;
   const b=id=>el.querySelector("#"+id);
+  if(b("ghUpdate"))b("ghUpdate").onclick=dispatchUpdate;
   if(b("ghRefresh"))b("ghRefresh").onclick=()=>{flash("Yenileniyor…");ghLoadData().then(ghLoadPrice).then(ghLoadNews).then(()=>{render(true);flash("Yenilendi");}).catch(e=>flash("Hata: "+e.message));};
   if(b("ghTokenBtn"))b("ghTokenBtn").onclick=setToken;
   if(b("ghSet"))b("ghSet").onclick=setToken;
