@@ -401,7 +401,49 @@
   .fchip.star.on{color:var(--accent);border-color:var(--accent);background:rgba(233,165,60,.08)}
   .iconbtn.star{font-size:14px}
   .iconbtn.star.on{color:var(--accent)}
+
+  /* ============ LIGHT MODE — Solarized (yumuşak bej / sarı) ============ */
+  :root[data-theme="light"]{
+    --ground:#fdf6e3;     /* base3 — sayfa zemini */
+    --surface:#f4edd8;    /* kartlar */
+    --surface-2:#efe7cf;  /* yükseltilmiş / hover */
+    --text:#574f3a;       /* sıcak koyu kahve-gri metin */
+    --muted:#8a7d5e;
+    --faint:#a99b78;
+    --accent:#b3890b;     /* solarized yellow */
+    --accent-2:#268bd2;   /* solarized blue */
+    --line:rgba(179,137,11,.30);
+    --line-cool:rgba(38,139,210,.22);
+    --good:#6f8b00;       /* solarized green */
+    --bad:#cb4b16;        /* solarized orange */
+  }
+  :root[data-theme="light"] body{
+    background:
+      radial-gradient(900px 500px at 88% -10%,rgba(38,139,210,.05),transparent 60%),
+      radial-gradient(800px 600px at 0% 0%,rgba(179,137,11,.07),transparent 55%),
+      var(--ground);
+  }
+  :root[data-theme="light"] header.bar{background:linear-gradient(180deg,rgba(238,232,213,.75),rgba(253,246,227,.35))}
+  :root[data-theme="light"] .glyph{text-shadow:0 0 14px rgba(179,137,11,.35)}
+  :root[data-theme="light"] .srcbar{background:rgba(238,232,213,.55)}
+  :root[data-theme="light"] .tape{background:linear-gradient(90deg,rgba(238,232,213,.95),rgba(244,237,216,.55),rgba(238,232,213,.95))}
+  :root[data-theme="light"] .fchip .fc,
+  :root[data-theme="light"] .iconbtn:hover{background:rgba(87,79,58,.08)}
+  :root[data-theme="light"] .co{border-top-color:rgba(87,79,58,.10)}
+  :root[data-theme="light"] .news-item{border-top-color:rgba(87,79,58,.10)}
+  :root[data-theme="light"] .dot{background:rgba(87,79,58,.18)}
+  :root[data-theme="light"] .rot-track{background:rgba(87,79,58,.06)}
+  :root[data-theme="light"] .rot-mid{background:rgba(87,79,58,.20)}
+  :root[data-theme="light"] .add-sector{background:rgba(87,79,58,.025)}
+  :root[data-theme="light"] .rep-body code{background:rgba(87,79,58,.08)}
+  :root[data-theme="light"] .cochart,
+  :root[data-theme="light"] .seczbig,
+  :root[data-theme="light"] #chartCanvas{background:rgba(87,79,58,.05)}
+  :root[data-theme="light"] .modal-bg{background:rgba(40,30,8,.30)}
+  :root[data-theme="light"] .modal-card{box-shadow:0 30px 80px rgba(80,60,20,.22)}
+  :root[data-theme="light"] .flash{box-shadow:0 10px 30px rgba(80,60,20,.25)}
 </style>
+<script>(function(){try{var t=localStorage.getItem("sm-theme");if(t==="light")document.documentElement.dataset.theme="light";}catch(e){}})();</script>
 
 <header class="bar">
   <div class="brand">
@@ -419,6 +461,7 @@
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
     <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
     <button class="btn ghost" id="resetBtn" title="Başlangıç haline döndür">↺ Sıfırla</button>
+    <button class="btn ghost" id="themeBtn" title="Açık / koyu tema">🌙</button>
     <input type="file" id="fileInput" accept="application/json" hidden />
   </div>
 </header>
@@ -791,6 +834,12 @@ function sortedCompanies(sec){
 function median(a){const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
 function hexA(h,a){const n=parseInt(h.slice(1),16);return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
 function histOf(t){const q=(priceData&&priceData.quotes)?priceData.quotes[(t||"").toUpperCase()]:null;return (q&&q.hist&&q.hist.c&&q.hist.c.length>1)?q.hist:null;}
+// Tema-duyarlı canvas renkleri (grid çizgileri)
+function isLight(){return document.documentElement.dataset.theme==="light";}
+function gridCol(strong){
+  if(isLight())return strong?"rgba(87,79,58,.30)":"rgba(87,79,58,.09)";
+  return strong?"rgba(255,255,255,.22)":"rgba(255,255,255,.06)";
+}
 /* ---------- Risk İştahı rejim bantları (rejim.json) ---------- */
 // 's': 0 Risk-On (yeşil) · 1 Nötr (amber) · 2 Risk-Off (kırmızı)
 const REGIME_COL=["#2E8B57","#E8A33D","#C0392B"];
@@ -863,7 +912,7 @@ function drawAxisChart(cv,hist,range){
   const yl=4;
   for(let k=0;k<=yl;k++){
     const v=mn+rng*k/yl,y=Y(v);
-    ctx.strokeStyle="rgba(255,255,255,.05)";ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.strokeStyle=gridCol(false);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
     ctx.fillStyle="#6b7480";ctx.fillText("$"+(v>=100?v.toFixed(0):v.toFixed(1)),padL-5,y);
   }
   // alan dolgusu
@@ -968,7 +1017,7 @@ function drawZAxis(cv,z,dates){
   ctx.textBaseline="middle";ctx.textAlign="right";
   for(let k=Math.ceil(mn);k<=Math.floor(mx);k++){
     const y=Y(k);
-    ctx.strokeStyle=k===0?"rgba(255,255,255,.22)":"rgba(255,255,255,.06)";ctx.lineWidth=k===0?1.2:1;
+    ctx.strokeStyle=gridCol(k===0);ctx.lineWidth=k===0?1.2:1;
     ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
     ctx.fillStyle=k===0?"#8B93A0":"#6b7480";ctx.fillText((k>0?"+":"")+k+"σ",padL-4,y);
   }
@@ -1605,6 +1654,19 @@ function wireReportForm(){
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("riskBadge").onclick=openRegimeModal;
+function currentTheme(){return document.documentElement.dataset.theme==="light"?"light":"dark";}
+function syncThemeBtn(){const b=document.getElementById("themeBtn");if(b)b.textContent=currentTheme()==="light"?"☀":"🌙";}
+function toggleTheme(){
+  const t=currentTheme()==="light"?"dark":"light";
+  if(t==="light")document.documentElement.dataset.theme="light";
+  else document.documentElement.removeAttribute("data-theme");
+  try{localStorage.setItem("sm-theme",t);}catch(e){}
+  syncThemeBtn();
+  render(true);   // grafik grid çizgileri tema-duyarlı → yeniden çiz
+  if(!document.getElementById("chartModal").hidden)renderChart();
+}
+document.getElementById("themeBtn").onclick=toggleTheme;
+syncThemeBtn();
 document.querySelectorAll('[data-close="news"]').forEach(el=>el.onclick=closeNews);
 document.querySelectorAll('[data-close="reports"]').forEach(el=>el.onclick=closeReports);
 document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeRegimeModal);
