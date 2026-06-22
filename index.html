@@ -1479,6 +1479,24 @@ function isEmbeddablePdf(u){u=(u||"").toLowerCase();return u.includes("drive.goo
 function pdfEmbed(u){u=u||"";let m=u.match(/drive\.google\.com\/file\/d\/([^/]+)/);if(m)return "https://drive.google.com/file/d/"+m[1]+"/preview";m=u.match(/[?&]id=([^&]+)/);if(m&&u.indexOf("drive.google.com")>=0)return "https://drive.google.com/file/d/"+m[1]+"/preview";return u;}
 function openReports(){if(!state.reports)state.reports=[];reportTickerFilter="";reportSecFilter="";document.getElementById("reportsModal").hidden=false;reportForm=null;renderReports();}
 function openReportsFor(ticker){if(!state.reports)state.reports=[];reportTickerFilter=(ticker||"").toUpperCase();reportSecFilter="";document.getElementById("reportsModal").hidden=false;reportForm=null;renderReports();}
+let pdfBlobCache={};
+function abToBase64(buf){const bytes=new Uint8Array(buf);let bin="";const ch=0x8000;for(let i=0;i<bytes.length;i+=ch){bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+ch));}return btoa(bin);}
+async function uploadBinary(path,file,msg){
+  const b64=abToBase64(await file.arrayBuffer());
+  let sha=null;
+  try{const g=await ghApi("/contents/"+path+"?ref="+GH.branch,{headers:ghHeaders()});if(g.ok){const j=await g.json();sha=j.sha;}}catch(e){}
+  const body={message:msg,content:b64,branch:GH.branch};if(sha)body.sha=sha;
+  const r=await ghApi("/contents/"+path,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)});
+  if(!r.ok)throw new Error("yükleme "+r.status);
+}
+async function pdfBlobUrl(path){
+  if(pdfBlobCache[path])return pdfBlobCache[path];
+  const r=await ghApi("/contents/"+path+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)throw new Error("PDF okunamadı ("+r.status+")");
+  const ab=await r.arrayBuffer();
+  const url=URL.createObjectURL(new Blob([ab],{type:"application/pdf"}));
+  pdfBlobCache[path]=url;return url;
+}
 function closeReports(){document.getElementById("reportsModal").hidden=true;reportForm=null;}
 function renderReports(){
   if(!state.reports)state.reports=[];
@@ -1511,10 +1529,12 @@ function renderReports(){
       <div class="rep-top"><span class="rep-title">${esc(r.title||"(başlıksız)")}</span><span class="rep-date">${esc(r.date||"")}</span></div>
       ${tags.length?`<div class="rep-tags">${tags.join("")}</div>`:""}
       ${r.body?`<div class="rep-body">${mdLite(r.body)}</div>`:""}
-      ${(r.link&&isEmbeddablePdf(r.link))?`<div class="rep-pdf"><iframe class="rep-frame" src="${esc(pdfEmbed(r.link))}" loading="lazy" referrerpolicy="no-referrer"></iframe></div>`:""}
+      ${r.pdfPath?`<div class="rep-pdf"><iframe class="rep-frame" data-pdfpath="${esc(r.pdfPath)}"></iframe></div>`
+        :((r.link&&isEmbeddablePdf(r.link))?`<div class="rep-pdf"><iframe class="rep-frame" src="${esc(pdfEmbed(r.link))}" loading="lazy" referrerpolicy="no-referrer"></iframe></div>`:"")}
       <div class="rep-foot">
         <span class="rep-author">${esc(r.author||"")}</span>
-        ${r.link?`<a class="rep-link" href="${esc(r.link)}" target="_blank" rel="noopener">📄 PDF'i aç</a>`:`<span class="rep-author">— PDF bağlantısı yok</span>`}
+        ${r.pdfPath?`<a class="rep-link" data-pdfopen="${esc(r.pdfPath)}" href="#">📄 PDF'i aç</a>`
+          :(r.link?`<a class="rep-link" href="${esc(r.link)}" target="_blank" rel="noopener">📄 PDF'i aç</a>`:`<span class="rep-author">— PDF yok</span>`)}
         <button class="rep-edit" data-edit="${r.id}">düzenle</button>
         <button class="rep-edit del" data-del="${r.id}">sil</button>
       </div></div>`;
@@ -1523,6 +1543,8 @@ function renderReports(){
   if(reportForm)wireReportForm();
   body.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{reportForm={id:b.dataset.edit};renderReports();body.scrollTop=0;});
   body.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(!confirm("Rapor silinsin mi?"))return;state.reports=state.reports.filter(x=>x.id!==b.dataset.del);render();flash("Rapor silindi");});
+  body.querySelectorAll("iframe[data-pdfpath]").forEach(fr=>{pdfBlobUrl(fr.dataset.pdfpath).then(u=>{fr.src=u;}).catch(()=>{const d=document.createElement("div");d.className="news-empty";d.textContent="PDF yüklenemedi";fr.replaceWith(d);});});
+  body.querySelectorAll("[data-pdfopen]").forEach(a=>a.onclick=(e)=>{e.preventDefault();pdfBlobUrl(a.dataset.pdfopen).then(u=>window.open(u,"_blank")).catch(()=>flash("PDF açılamadı"));});
 }
 function reportFormHtml(rf){
   const r=rf.id?state.reports.find(x=>x.id===rf.id):null;const v=r||{};
@@ -1537,22 +1559,46 @@ function reportFormHtml(rf){
       <div><label>Yazar (ops.)</label><input class="rf-author" value="${esc(v.author||"")}" placeholder="—"/></div>
     </div>
     <div><label>Metin — markdown: **kalın** *italik* [bağlantı](url)</label><textarea class="rf-body" placeholder="Analiz / tez metni...">${esc(v.body||"")}</textarea></div>
-    <div style="margin-top:9px"><label>Rapor PDF bağlantısı (Google Drive linki veya .pdf URL)</label><input class="rf-link" value="${esc(v.link||"")}" placeholder="https://drive.google.com/file/d/.../view"/></div>
+    <div style="margin-top:9px"><label>📎 Bilgisayardan PDF yükle (önerilen)</label>
+      <input type="file" class="rf-pdf" accept="application/pdf"/>
+      ${v.pdfPath?`<div class="rf-pdfcur">📎 Yüklü: <b>${esc(v.pdfName||v.pdfPath)}</b> <button type="button" class="rep-edit del" id="rfPdfDel">kaldır</button></div>`:""}
+      <div class="rf-pdfstat" id="rfPdfStat"></div>
+    </div>
+    <div style="margin-top:9px"><label>…veya PDF bağlantısı (Google Drive linki / .pdf URL)</label><input class="rf-link" value="${esc(v.link||"")}" placeholder="https://drive.google.com/file/d/.../view"/></div>
     <div class="actions"><button class="btn ghost" id="rfCancel">İptal</button><button class="btn primary" id="rfSave">${r?"Güncelle":"Kaydet"}</button></div>
   </div>`;
 }
 function wireReportForm(){
   const f=document.querySelector('[data-repform="1"]');if(!f)return;
+  let pdfRemove=false;
+  const delBtn=document.getElementById("rfPdfDel");
+  if(delBtn)delBtn.onclick=()=>{pdfRemove=true;delBtn.parentElement.innerHTML="📎 Kaldırılacak (Kaydet'e bas)";};
   document.getElementById("rfCancel").onclick=()=>{reportForm=null;renderReports();};
-  document.getElementById("rfSave").onclick=()=>{
+  document.getElementById("rfSave").onclick=async()=>{
     const title=f.querySelector(".rf-title").value.trim();
     if(!title){flash("Başlık gerekli");return;}
-    const data={title,date:f.querySelector(".rf-date").value||todayStr(),sectorId:f.querySelector(".rf-sec").value||"",
+    const id=reportForm.id||uid();
+    const data={id,title,date:f.querySelector(".rf-date").value||todayStr(),sectorId:f.querySelector(".rf-sec").value||"",
       tickers:f.querySelector(".rf-tickers").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean),
       author:f.querySelector(".rf-author").value.trim(),body:f.querySelector(".rf-body").value,link:f.querySelector(".rf-link").value.trim()};
+    const existing=reportForm.id?state.reports.find(x=>x.id===reportForm.id):null;
+    if(existing&&existing.pdfPath){data.pdfPath=existing.pdfPath;data.pdfName=existing.pdfName;}
+    if(pdfRemove){data.pdfPath="";data.pdfName="";}
+    const file=f.querySelector(".rf-pdf").files[0];
+    if(file){
+      if(!ghReady()){flash("PDF yüklemek için GitHub token gerekli");return;}
+      if(file.size>25*1024*1024){flash("PDF çok büyük (max ~25MB)");return;}
+      const stat=document.getElementById("rfPdfStat");if(stat)stat.textContent="PDF yükleniyor…";
+      try{
+        const path="raporlar/"+id+".pdf";
+        await uploadBinary(path,file,"rapor PDF: "+title);
+        data.pdfPath=path;data.pdfName=file.name;delete pdfBlobCache[path];
+        if(stat)stat.textContent="PDF yüklendi ✓";
+      }catch(e){flash("PDF yüklenemedi: "+e.message);return;}
+    }
     if(!state.reports)state.reports=[];
     if(reportForm.id){const r=state.reports.find(x=>x.id===reportForm.id);if(r)Object.assign(r,data);}
-    else{data.id=uid();state.reports.unshift(data);}
+    else{state.reports.unshift(data);}
     reportForm=null;render();flash("Rapor kaydedildi");
   };
 }
