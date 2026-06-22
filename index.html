@@ -56,7 +56,14 @@
     display:flex;align-items:center;gap:9px;
     padding:6px 13px;border-radius:9px;border:1px solid var(--line-cool);
     background:var(--surface);font-family:var(--mono);
+    cursor:pointer;transition:background .15s,box-shadow .15s;
   }
+  .riskbadge:hover{background:var(--surface-2);box-shadow:0 0 0 1px var(--line-cool)}
+  .regime-meta{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .regime-body{margin-top:4px}
+  .regime-body img{width:100%;height:auto;display:block;border-radius:8px;
+    border:1px solid var(--line-cool);background:#fff}
+  .regime-body .regime-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
   .riskbadge .rb-dot{width:9px;height:9px;border-radius:50%;flex:none}
   .riskbadge .rb-lbl{color:var(--faint);font-size:9.5px;letter-spacing:.14em}
   .riskbadge .rb-state{font-size:13px;font-weight:700;letter-spacing:.02em}
@@ -423,6 +430,15 @@
   </div>
 </div>
 
+<div class="modal" id="regimeModal" hidden>
+  <div class="modal-bg" data-close="regime"></div>
+  <div class="modal-card big">
+    <button class="modal-x" data-close="regime" title="Kapat">✕</button>
+    <div class="sheet-head"><h3>📊 Risk İştahı — Rejim & S&amp;P 500 (Son 6 Ay)</h3><div id="regimeMeta" class="regime-meta"></div></div>
+    <div class="regime-body" id="regimeBody"></div>
+  </div>
+</div>
+
 <div class="modal" id="newsModal" hidden>
   <div class="modal-bg" data-close="news"></div>
   <div class="modal-card big">
@@ -502,11 +518,12 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let newsData=null;  // haberler.json (salt-okunur, Actions üretir)
 let regimeData=null, regimeCommit=null;  // rejim.json (Risk İştahı rejim bantları, Actions üretir)
+let regimeChartUrl=null, regimeChartCommit=null;  // rejim_spx.png (rozete tıklayınca açılan grafik)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -542,6 +559,14 @@ async function ghLoadRegime(){
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.segments)regimeData=d;}
   regimeCommit=await ghLatestCommit(GH.regimeFile);
 }
+async function ghLoadRegimeChart(){
+  const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const blob=await r.blob();
+  if(regimeChartUrl)URL.revokeObjectURL(regimeChartUrl);
+  regimeChartUrl=URL.createObjectURL(blob);
+  regimeChartCommit=await ghLatestCommit(GH.regimeChartFile);
+}
 async function ghLatestCommit(path){try{const r=await ghApi("/commits?path="+encodeURIComponent(path)+"&sha="+GH.branch+"&per_page=1&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});if(!r.ok)return null;const a=await r.json();return (a&&a[0])?a[0].sha:null;}catch(e){return null;}}
 async function ghSaveData(){
   if(!ghReady())return;
@@ -566,6 +591,8 @@ function startGitPoll(){
       if(nc&&nc!==newsCommit){await ghLoadNews();render(true);flash("Haberler güncellendi");}
       const rc=await ghLatestCommit(GH.regimeFile);
       if(rc&&rc!==regimeCommit){await ghLoadRegime();render(true);flash("Risk rejimi güncellendi");}
+      const rcc=await ghLatestCommit(GH.regimeChartFile);
+      if(rcc&&rcc!==regimeChartCommit){await ghLoadRegimeChart();if(!document.getElementById("regimeModal").hidden)renderRegimeModal();}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -576,7 +603,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -969,7 +996,7 @@ function renderRiskBadge(){
   const score=(regimeData.last_score>=0?"+":"")+Number(regimeData.last_score).toFixed(2);
   const d=regimeData.last_date||"",dlbl=d?d.slice(8,10)+"."+d.slice(5,7):"";
   let upd="";if(regimeData.updated){try{upd=new Date(regimeData.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}
-  el.title=`Risk İştahı — ${REGIME_NAMES_TR[st]}\nSkor ${score} (${d})\nEşikler: Risk-On/Nötr ${regimeData.thr_low}  ·  Nötr/Risk-Off ${regimeData.thr_high}`+(upd?`\nGüncellendi: ${upd}`:"");
+  el.title=`Risk İştahı — ${REGIME_NAMES_TR[st]}\nSkor ${score} (${d})\nEşikler: Risk-On/Nötr ${regimeData.thr_low}  ·  Nötr/Risk-Off ${regimeData.thr_high}`+(upd?`\nGüncellendi: ${upd}`:"")+`\n\nTıkla: 6 aylık rejim & S&P 500 grafiği`;
   el.style.borderColor=hexA(col,.5);
   el.innerHTML=`<span class="rb-dot" style="background:${col};box-shadow:0 0 8px ${hexA(col,.7)}"></span>`+
     `<span class="rb-lbl">RİSK İŞTAHI</span>`+
@@ -1302,6 +1329,27 @@ function allNewsItems(){
 let newsFilter="";
 function openNews(ticker){newsFilter=ticker||"";document.getElementById("newsModal").hidden=false;renderNews();}
 function closeNews(){document.getElementById("newsModal").hidden=true;}
+/* ---------- Risk İştahı grafiği (rozete tıklayınca) ---------- */
+function openRegimeModal(){
+  document.getElementById("regimeModal").hidden=false;
+  renderRegimeModal();
+  if(!regimeChartUrl&&ghReady()){
+    ghLoadRegimeChart().then(()=>{if(!document.getElementById("regimeModal").hidden)renderRegimeModal();}).catch(()=>{});
+  }
+}
+function closeRegimeModal(){document.getElementById("regimeModal").hidden=true;}
+function renderRegimeModal(){
+  const meta=document.getElementById("regimeMeta"),body=document.getElementById("regimeBody");
+  if(regimeData&&regimeData.last_state!=null){
+    const st=regimeData.last_state,sc=(regimeData.last_score>=0?"+":"")+Number(regimeData.last_score).toFixed(2);
+    meta.innerHTML=`<b style="color:${REGIME_COL[st]}">${REGIME_NAMES_TR[st]}</b> · skor ${sc} · ${regimeData.last_date||""}`;
+  }else meta.textContent="";
+  if(regimeChartUrl){
+    body.innerHTML=`<img src="${regimeChartUrl}" alt="Risk İştahı — Rejim & S&P 500 (Son 6 Ay)">`;
+  }else{
+    body.innerHTML=`<div class="regime-empty">Grafik yükleniyor… Görünmüyorsa GitHub'a bağlan; grafik her gün otomatik koşuyla üretilir (elle: Actions → Run workflow).</div>`;
+  }
+}
 function renderNews(){
   const body=document.getElementById("newsBody"),ctl=document.getElementById("newsControls");
   if(!newsData||!newsData.news){body.innerHTML=`<div class="news-empty">Haber verisi yok. GitHub'a bağlan; haberler her gece otomatik koşuyla gelir (elle: Actions → Run workflow).</div>`;ctl.innerHTML="";return;}
@@ -1404,8 +1452,11 @@ function wireReportForm(){
 }
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
+document.getElementById("riskBadge").onclick=openRegimeModal;
 document.querySelectorAll('[data-close="news"]').forEach(el=>el.onclick=closeNews);
 document.querySelectorAll('[data-close="reports"]').forEach(el=>el.onclick=closeReports);
+document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeRegimeModal);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
 document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();});
 
 /* ---------- startup ---------- */
@@ -1413,7 +1464,7 @@ async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
