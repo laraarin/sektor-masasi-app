@@ -377,9 +377,8 @@
   .rep-body a{color:var(--accent-2)}
   .rep-body code{font-family:var(--mono);background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px;font-size:12px}
   .rep-foot{display:flex;gap:12px;align-items:center;margin-top:9px}
-  .rep-link{font-size:12px;color:var(--accent-2);text-decoration:none;background:none;border:none;padding:0;cursor:pointer;font-family:inherit}
+  .rep-link{font-size:12px;color:var(--accent-2);text-decoration:none}
   .rep-link:hover{text-decoration:underline}
-  .rf-pdfcur{font-size:12px;color:var(--muted);margin-left:8px}
   .rep-author{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-right:auto}
   .rep-edit{background:none;border:none;color:var(--faint);font-family:var(--mono);font-size:12px;cursor:pointer}
   .rep-edit:hover{color:var(--text)}
@@ -394,6 +393,10 @@
   .rep-form .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
   .news-badge{font-family:var(--mono);font-size:10px;color:var(--accent-2);border:1px solid var(--line-cool);border-radius:4px;padding:0 5px;margin-left:6px;cursor:pointer}
   .news-badge:hover{border-color:var(--accent-2);color:var(--accent)}
+  .rep-badge{font-family:var(--mono);font-size:10px;color:var(--good);border:1px solid var(--line-cool);border-radius:4px;padding:0 5px;margin-left:6px;cursor:pointer}
+  .rep-badge:hover{border-color:var(--good);color:var(--good);background:rgba(127,176,105,.1)}
+  .rep-pdf{margin:8px 0}
+  .rep-frame{width:100%;height:440px;border:1px solid var(--line-cool);border-radius:8px;background:#fff}
   /* ortak takip listesi (yıldız) */
   .fchip.star.on{color:var(--accent);border-color:var(--accent);background:rgba(233,165,60,.08)}
   .iconbtn.star{font-size:14px}
@@ -1228,6 +1231,7 @@ function cardEl(sec,i){
   card.querySelectorAll('[data-act="delCo"]').forEach(b=>b.onclick=()=>{const s=state.sectors.find(s=>s.id===sec.id);s.companies=s.companies.filter(c=>c.id!==b.dataset.id);render();});
   card.querySelectorAll('[data-chart]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();openChart(b.dataset.chart);});
   card.querySelectorAll('[data-news]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();openNews(b.dataset.news);});
+  card.querySelectorAll('[data-report]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();openReportsFor(b.dataset.report);});
   card.querySelectorAll('[data-star]').forEach(b=>b.onclick=(e)=>{e.stopPropagation();toggleStar(b.dataset.tk);});
   const sortSel=card.querySelector('.sortsel');
   if(sortSel)sortSel.onchange=()=>{const k=sortSel.value;if(k==="manual")delete sortPref[sec.id];else sortPref[sec.id]={key:k,dir:sortDefaultDir(k)};saveSort();render(true);};
@@ -1256,6 +1260,8 @@ function coRow(sec,c){
   const mcTag=(q&&q.marketCap)?`<span class="mc-tag" title="Piyasa değeri">${fmtMC(q.marketCap)}</span>`:"";
   const ncnt=newsCountFor(c.ticker);
   const nb=ncnt?`<span class="news-badge" data-news="${esc(c.ticker)}" title="${ncnt} haber — aç">📰 ${ncnt}</span>`:"";
+  const rcnt=reportCountFor(c.ticker);
+  const rb=`<span class="rep-badge" data-report="${esc(c.ticker)}" title="${rcnt?rcnt+' rapor — aç':'Rapor ekle / gör'}">📄 ${rcnt||'+'}</span>`;
   const sS=isStarred(c.ticker);
   const starBtns=`<button class="iconbtn star ${sS?'on':''}" data-star="1" data-tk="${esc(c.ticker)}" title="${sS?'Takipten çıkar':'Takip listesine ekle'}">${sS?'★':'☆'}</button>`;
   let px="";
@@ -1301,7 +1307,7 @@ function coRow(sec,c){
         <div class="cofx-cv">${convTools}</div>
       </div>
       <div class="cofx-text">
-        <div class="cofx-name">${nameLine}${nb}</div>
+        <div class="cofx-name">${nameLine}${nb}${rb}</div>
         ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
       </div>
       ${chartBlock}
@@ -1312,7 +1318,7 @@ function coRow(sec,c){
     <div class="co-right"><span class="conv" title="Konviksiyon ${c.conv||0}/3">${dots}</span>
     <span class="co-tools">${starBtns}<button class="iconbtn" data-act="editCo" data-id="${c.id}" title="Düzenle">✎</button>
     <button class="iconbtn del" data-act="delCo" data-id="${c.id}" title="Sil">✕</button></span></div>
-    <div class="meta"><div class="nm">${esc(c.name||"—")} ${sizeTag}${mcTag}${nb}</div>${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div></div>`;
+    <div class="meta"><div class="nm">${esc(c.name||"—")} ${sizeTag}${mcTag}${nb}${rb}</div>${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div></div>`;
 }
 function formEl(sec,co,prefill){
   const v=co||prefill||{};const conv=co?co.conv:2;
@@ -1467,20 +1473,34 @@ function mdLite(s){
 function todayStr(){try{return new Date().toISOString().slice(0,10);}catch(e){return "";}}
 let reportForm=null;      // {id} düzenle, {} yeni, null kapalı
 let reportSecFilter="";
-function openReports(){if(!state.reports)state.reports=[];document.getElementById("reportsModal").hidden=false;reportForm=null;renderReports();}
+let reportTickerFilter="";
+function reportCountFor(tk){if(!state.reports)return 0;tk=(tk||"").toUpperCase();return state.reports.filter(r=>(r.tickers||[]).some(x=>(x||"").toUpperCase()===tk)).length;}
+function isEmbeddablePdf(u){u=(u||"").toLowerCase();return u.includes("drive.google.com")||/\.pdf(\?|#|$)/.test(u);}
+function pdfEmbed(u){u=u||"";let m=u.match(/drive\.google\.com\/file\/d\/([^/]+)/);if(m)return "https://drive.google.com/file/d/"+m[1]+"/preview";m=u.match(/[?&]id=([^&]+)/);if(m&&u.indexOf("drive.google.com")>=0)return "https://drive.google.com/file/d/"+m[1]+"/preview";return u;}
+function openReports(){if(!state.reports)state.reports=[];reportTickerFilter="";reportSecFilter="";document.getElementById("reportsModal").hidden=false;reportForm=null;renderReports();}
+function openReportsFor(ticker){if(!state.reports)state.reports=[];reportTickerFilter=(ticker||"").toUpperCase();reportSecFilter="";document.getElementById("reportsModal").hidden=false;reportForm=null;renderReports();}
 function closeReports(){document.getElementById("reportsModal").hidden=true;reportForm=null;}
 function renderReports(){
   if(!state.reports)state.reports=[];
   const body=document.getElementById("reportsBody"),ctl=document.getElementById("reportsControls");
-  ctl.innerHTML=`<div class="sheet-controls">
-    <select class="minisel" id="repSecFilter"><option value="">Tüm sektörler</option>${state.sectors.map(s=>`<option value="${s.id}" ${reportSecFilter===s.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select>
-    <button class="btn primary sm" id="repAdd">+ Rapor ekle</button></div>`;
-  document.getElementById("repSecFilter").onchange=function(){reportSecFilter=this.value;renderReports();};
-  document.getElementById("repAdd").onclick=()=>{reportForm={};renderReports();body.scrollTop=0;};
+  if(reportTickerFilter){
+    ctl.innerHTML=`<div class="sheet-controls">
+      <span class="news-meta"><b style="color:var(--accent-2)">${esc(reportTickerFilter)}</b> raporları</span>
+      <button class="btn ghost sm" id="repAll">tüm raporlar</button>
+      <button class="btn primary sm" id="repAdd">+ Rapor ekle</button></div>`;
+    document.getElementById("repAll").onclick=()=>{reportTickerFilter="";renderReports();};
+  }else{
+    ctl.innerHTML=`<div class="sheet-controls">
+      <select class="minisel" id="repSecFilter"><option value="">Tüm sektörler</option>${state.sectors.map(s=>`<option value="${s.id}" ${reportSecFilter===s.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select>
+      <button class="btn primary sm" id="repAdd">+ Rapor ekle</button></div>`;
+    document.getElementById("repSecFilter").onchange=function(){reportSecFilter=this.value;renderReports();};
+  }
+  document.getElementById("repAdd").onclick=()=>{reportForm=reportTickerFilter?{tickers:[reportTickerFilter]}:{};renderReports();body.scrollTop=0;};
   let html="";
   if(reportForm)html+=reportFormHtml(reportForm);
   let reps=state.reports.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
-  if(reportSecFilter)reps=reps.filter(r=>r.sectorId===reportSecFilter);
+  if(reportTickerFilter)reps=reps.filter(r=>(r.tickers||[]).some(x=>(x||"").toUpperCase()===reportTickerFilter));
+  else if(reportSecFilter)reps=reps.filter(r=>r.sectorId===reportSecFilter);
   if(!reps.length&&!reportForm)html+=`<div class="news-empty">Henüz rapor yok. "+ Rapor ekle" ile başla.</div>`;
   html+=reps.map(r=>{
     if(reportForm&&reportForm.id===r.id)return "";   // bu rapor yukarıda form olarak açık
@@ -1490,11 +1510,11 @@ function renderReports(){
     return `<div class="rep-card">
       <div class="rep-top"><span class="rep-title">${esc(r.title||"(başlıksız)")}</span><span class="rep-date">${esc(r.date||"")}</span></div>
       ${tags.length?`<div class="rep-tags">${tags.join("")}</div>`:""}
-      <div class="rep-body">${mdLite(r.body)}</div>
+      ${r.body?`<div class="rep-body">${mdLite(r.body)}</div>`:""}
+      ${(r.link&&isEmbeddablePdf(r.link))?`<div class="rep-pdf"><iframe class="rep-frame" src="${esc(pdfEmbed(r.link))}" loading="lazy" referrerpolicy="no-referrer"></iframe></div>`:""}
       <div class="rep-foot">
         <span class="rep-author">${esc(r.author||"")}</span>
-        ${r.link?`<a class="rep-link" href="${esc(r.link)}" target="_blank" rel="noopener">🔗 Bağlantı</a>`:""}
-        ${r.pdfPath?`<button class="rep-link" data-pdf="${esc(r.pdfPath)}" data-pdfname="${esc(r.pdfName||"PDF")}">📄 PDF</button>`:""}
+        ${r.link?`<a class="rep-link" href="${esc(r.link)}" target="_blank" rel="noopener">📄 PDF'i aç</a>`:`<span class="rep-author">— PDF bağlantısı yok</span>`}
         <button class="rep-edit" data-edit="${r.id}">düzenle</button>
         <button class="rep-edit del" data-del="${r.id}">sil</button>
       </div></div>`;
@@ -1503,7 +1523,6 @@ function renderReports(){
   if(reportForm)wireReportForm();
   body.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{reportForm={id:b.dataset.edit};renderReports();body.scrollTop=0;});
   body.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{if(!confirm("Rapor silinsin mi?"))return;state.reports=state.reports.filter(x=>x.id!==b.dataset.del);render();flash("Rapor silindi");});
-  body.querySelectorAll("[data-pdf]").forEach(b=>b.onclick=()=>openReportPdf(b.dataset.pdf,b.dataset.pdfname));
 }
 function reportFormHtml(rf){
   const r=rf.id?state.reports.find(x=>x.id===rf.id):null;const v=r||{};
@@ -1518,66 +1537,24 @@ function reportFormHtml(rf){
       <div><label>Yazar (ops.)</label><input class="rf-author" value="${esc(v.author||"")}" placeholder="—"/></div>
     </div>
     <div><label>Metin — markdown: **kalın** *italik* [bağlantı](url)</label><textarea class="rf-body" placeholder="Analiz / tez metni...">${esc(v.body||"")}</textarea></div>
-    <div style="margin-top:9px"><label>Dış bağlantı (ops.)</label><input class="rf-link" value="${esc(v.link||"")}" placeholder="https://drive.google.com/..."/></div>
-    <div style="margin-top:9px"><label>PDF ekle (ops.)</label>
-      <input class="rf-pdf" type="file" accept="application/pdf"/>
-      ${v.pdfPath?`<span class="rf-pdfcur">📄 Mevcut: <b>${esc(v.pdfName||"PDF")}</b> <button type="button" class="rf-pdfdel rep-edit del">kaldır</button></span>`:""}
-    </div>
+    <div style="margin-top:9px"><label>Rapor PDF bağlantısı (Google Drive linki veya .pdf URL)</label><input class="rf-link" value="${esc(v.link||"")}" placeholder="https://drive.google.com/file/d/.../view"/></div>
     <div class="actions"><button class="btn ghost" id="rfCancel">İptal</button><button class="btn primary" id="rfSave">${r?"Güncelle":"Kaydet"}</button></div>
   </div>`;
 }
 function wireReportForm(){
   const f=document.querySelector('[data-repform="1"]');if(!f)return;
   document.getElementById("rfCancel").onclick=()=>{reportForm=null;renderReports();};
-  const pd=f.querySelector(".rf-pdfdel");
-  if(pd)pd.onclick=()=>{f.dataset.pdfremove="1";const c=f.querySelector(".rf-pdfcur");if(c)c.innerHTML="📄 PDF kaldırılacak — Kaydet'e bas";};
-  document.getElementById("rfSave").onclick=async()=>{
+  document.getElementById("rfSave").onclick=()=>{
     const title=f.querySelector(".rf-title").value.trim();
     if(!title){flash("Başlık gerekli");return;}
-    const id=reportForm.id||uid();
     const data={title,date:f.querySelector(".rf-date").value||todayStr(),sectorId:f.querySelector(".rf-sec").value||"",
       tickers:f.querySelector(".rf-tickers").value.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean),
       author:f.querySelector(".rf-author").value.trim(),body:f.querySelector(".rf-body").value,link:f.querySelector(".rf-link").value.trim()};
-    const existing=reportForm.id?state.reports.find(x=>x.id===reportForm.id):null;
-    const fi=f.querySelector(".rf-pdf"),file=fi&&fi.files&&fi.files[0];
-    if(file){
-      if(!ghReady()){flash("PDF yüklemek için önce GitHub'a bağlan");return;}
-      if(file.type!=="application/pdf"){flash("Sadece PDF dosyası");return;}
-      if(file.size>25*1024*1024){flash("PDF çok büyük (>25 MB)");return;}
-      const btn=document.getElementById("rfSave");btn.disabled=true;flash("PDF yükleniyor…");
-      try{const path="raporlar/"+id+".pdf";await ghUploadPdf(path,file);data.pdfPath=path;data.pdfName=file.name;}
-      catch(e){btn.disabled=false;flash("PDF yüklenemedi: "+e.message);return;}
-    }else if(f.dataset.pdfremove==="1"){data.pdfPath="";data.pdfName="";}
-    else if(existing&&existing.pdfPath){data.pdfPath=existing.pdfPath;data.pdfName=existing.pdfName;}
     if(!state.reports)state.reports=[];
     if(reportForm.id){const r=state.reports.find(x=>x.id===reportForm.id);if(r)Object.assign(r,data);}
-    else{data.id=id;state.reports.unshift(data);}
+    else{data.id=uid();state.reports.unshift(data);}
     reportForm=null;render();flash("Rapor kaydedildi");
   };
-}
-// PDF'i veri repo'suna yükle (base64; varsa üzerine yazar)
-async function ghUploadPdf(path,file){
-  if(!ghReady())throw new Error("GitHub bağlı değil");
-  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=()=>rej(r.error||new Error("okuma hatası"));r.readAsDataURL(file);});
-  let sha;
-  const g=await ghApi("/contents/"+path+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});
-  if(g.ok){try{sha=(await g.json()).sha;}catch(e){}}
-  const body={message:"rapor PDF: "+path,content:b64,branch:GH.branch};if(sha)body.sha=sha;
-  const r=await ghApi("/contents/"+path,{method:"PUT",headers:ghHeaders(),body:JSON.stringify(body)});
-  if(!r.ok)throw new Error("HTTP "+r.status);
-}
-// PDF'i veri repo'sundan çekip yeni sekmede aç
-async function openReportPdf(path,name){
-  if(!ghReady()){flash("PDF için GitHub'a bağlan");return;}
-  flash("PDF açılıyor…");
-  try{
-    const r=await ghApi("/contents/"+path+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
-    if(!r.ok)throw new Error("bulunamadı ("+r.status+")");
-    const blob=new Blob([await r.arrayBuffer()],{type:"application/pdf"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");a.href=url;a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-  }catch(e){flash("PDF hatası: "+e.message);}
 }
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
