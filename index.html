@@ -351,11 +351,20 @@
   /* ---- haber / rapor sayfaları (modal) ---- */
   .modal-card.big{width:min(820px,94vw);max-height:88vh;display:flex;flex-direction:column}
   /* Sinyal paneli: geniş + köşeden boyutlandırılabilir */
-  .modal-card.signal-card{width:min(1180px,96vw);min-width:560px;max-width:97vw;max-height:92vh;
+  /* Sinyal modalı sol-üste sabitlenir ki köşeden sürükleyince resize doğal çalışsın */
+  #signalModal{align-items:flex-start;justify-content:flex-start;padding:4vh 0 0 3vw}
+  .modal-card.signal-card{width:min(1180px,93vw);min-width:540px;max-width:96vw;height:84vh;max-height:92vh;
     resize:both;overflow:hidden}
-  .signal-card .sheet-body{overflow:auto}        /* gerekirse yatay+dikey kaydırma */
-  .resize-hint{position:absolute;right:5px;bottom:3px;color:var(--faint);font-size:12px;
-    font-family:var(--mono);opacity:.65;pointer-events:none}
+  .signal-card .sheet-body{overflow:auto;flex:1}        /* gerekirse yatay+dikey kaydırma */
+  .resize-hint{position:absolute;right:4px;bottom:2px;color:var(--faint);font-size:13px;
+    font-family:var(--mono);opacity:.6;pointer-events:none}
+  /* açılır-kapanır metodoloji */
+  .sig-method{margin:0 0 12px;padding:12px 14px;border:1px solid var(--line-cool);border-radius:9px;
+    background:var(--surface);font-size:12.5px;line-height:1.55;color:var(--muted);max-height:40vh;overflow:auto}
+  .sig-method p{margin:0 0 8px} .sig-method p:last-child{margin:0}
+  .sig-method b{color:var(--text)}
+  .sig-method code{font-family:var(--mono);background:rgba(127,176,105,.10);padding:1px 5px;border-radius:4px;color:var(--text);font-size:11.5px}
+  .sig-caveat{color:var(--faint);font-style:italic}
   .sheet-head{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:0 28px 12px 0;flex-wrap:wrap}
   .sheet-head h3{margin:0;font-size:16px;font-weight:620;letter-spacing:.02em}
   .sheet-body{overflow-y:auto;padding-right:4px}
@@ -531,7 +540,16 @@
   <div class="modal-bg" data-close="signal"></div>
   <div class="modal-card big signal-card">
     <button class="modal-x" data-close="signal" title="Kapat">✕</button>
-    <div class="sheet-head"><h3>📊 Quant Sinyal — Momentum &amp; Mean Reversion</h3><div id="signalControls" class="sheet-controls"></div></div>
+    <div class="sheet-head"><h3>📊 Quant Sinyal — Momentum &amp; Mean Reversion</h3>
+      <div id="signalControls" class="sheet-controls"><button class="btn sm" id="methodBtn" title="Metodoloji">ℹ️ Metodoloji ▾</button></div></div>
+    <div id="signalMethod" class="sig-method" hidden>
+      <p><b>Amaç.</b> İki klasik faktör — momentum ve mean reversion — rejime göre yumuşak ağırlıkla birleştirilir. Skorlar tanımlayıcı sıralamadır (gerçekleşmiş getiri değil).</p>
+      <p><b>1) Momentum</b> (orta vade, risk-ayarlı). <code>mom = P[t−21]/P[t−L] − 1</code>, L≈11 ay (son 1 ay atlanır → kısa vadeli reversal kirletmesin). Yıllık vol'e bölünür (Sharpe-momentum); fiyat 150g ortalamanın altındaysa pozitif momentum ×0.6. Evren genelinde z-skor → <code>MOM_z</code>.</p>
+      <p><b>2) Mean Reversion</b> (kısa vade, evren-nötr). Günlük getiriden evrenin ortalaması çıkarılır (residual); son 20g birikim fade edilir: <code>REV = −Σ residual</code>. Evren z-skor → <code>REV_z</code>. (SPY/QQQ/IWM endeksleri evrene girmez.)</p>
+      <p><b>3) Rejim yumuşak ağırlık.</b> Risk İştahı skorunun eşiklere uzaklığından logistic üyelik → ağırlıklar: <b>Risk-On</b> %85/%15, <b>Nötr</b> %35/%65, <b>Risk-Off</b> %20/%30 (brüt %50). Geçişler yumuşatılır (whipsaw yok; reversiyon Nötr'de zirve).</p>
+      <p><b>4) Bileşik.</b> <code>Bileşik = brüt × (w_mom·MOM_z + w_rev·REV_z)</code> → Güçlü Al (≥1) · Al (≥0.4) · Nötr · Sat (≤−0.4) · Güçlü Sat (≤−1).</p>
+      <p class="sig-caveat"><b>Uyarılar.</b> ~1 yıl geçmiş (momentum ~11 ay); işlem maliyeti ve backtest yok; eşikler in-sample; rejim VIX/MOVE/HY makro proxy'dir. Yatırım tavsiyesi değildir.</p>
+    </div>
     <div id="signalStrip"></div>
     <div class="sheet-body" id="signalBody"></div>
     <span class="resize-hint" title="Köşeden sürükleyerek boyutlandır">⤡</span>
@@ -1777,6 +1795,10 @@ function renderSignalModal(){
   body.querySelectorAll("[data-sigtk]").forEach(el=>el.onclick=()=>{const t=el.dataset.sigtk;closeSignalModal();openChart(t);});
 }
 document.getElementById("signalBtn").onclick=openSignalModal;
+document.getElementById("methodBtn").onclick=()=>{
+  const m=document.getElementById("signalMethod"),b=document.getElementById("methodBtn");
+  m.hidden=!m.hidden;b.innerHTML="ℹ️ Metodoloji "+(m.hidden?"▾":"▴");
+};
 document.querySelectorAll('[data-close="signal"]').forEach(el=>el.onclick=closeSignalModal);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("signalModal").hidden)closeSignalModal();});
 document.querySelectorAll('[data-close="news"]').forEach(el=>el.onclick=closeNews);
