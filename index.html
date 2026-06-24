@@ -350,6 +350,12 @@
   .flash.show{opacity:1;transform:translateX(-50%) translateY(0)}
   /* ---- haber / rapor sayfaları (modal) ---- */
   .modal-card.big{width:min(820px,94vw);max-height:88vh;display:flex;flex-direction:column}
+  /* Sinyal paneli: geniş + köşeden boyutlandırılabilir */
+  .modal-card.signal-card{width:min(1180px,96vw);min-width:560px;max-width:97vw;max-height:92vh;
+    resize:both;overflow:hidden}
+  .signal-card .sheet-body{overflow:auto}        /* gerekirse yatay+dikey kaydırma */
+  .resize-hint{position:absolute;right:5px;bottom:3px;color:var(--faint);font-size:12px;
+    font-family:var(--mono);opacity:.65;pointer-events:none}
   .sheet-head{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:0 28px 12px 0;flex-wrap:wrap}
   .sheet-head h3{margin:0;font-size:16px;font-weight:620;letter-spacing:.02em}
   .sheet-body{overflow-y:auto;padding-right:4px}
@@ -523,11 +529,12 @@
 
 <div class="modal" id="signalModal" hidden>
   <div class="modal-bg" data-close="signal"></div>
-  <div class="modal-card big">
+  <div class="modal-card big signal-card">
     <button class="modal-x" data-close="signal" title="Kapat">✕</button>
     <div class="sheet-head"><h3>📊 Quant Sinyal — Momentum &amp; Mean Reversion</h3><div id="signalControls" class="sheet-controls"></div></div>
     <div id="signalStrip"></div>
     <div class="sheet-body" id="signalBody"></div>
+    <span class="resize-hint" title="Köşeden sürükleyerek boyutlandır">⤡</span>
   </div>
 </div>
 
