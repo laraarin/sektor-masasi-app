@@ -460,7 +460,6 @@
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
     <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
-    <button class="btn ghost" id="resetBtn" title="Başlangıç haline döndür">↺ Sıfırla</button>
     <button class="btn ghost" id="themeBtn" title="Açık / koyu tema">🌙</button>
     <input type="file" id="fileInput" accept="application/json" hidden />
   </div>
@@ -1442,10 +1441,6 @@ document.getElementById("fileInput").onchange=(e)=>{
   const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.sectors)throw 0;state=d;ui.openForm=null;render();flash("Veri yüklendi");}catch(err){flash("Geçersiz dosya");}};
   r.readAsText(f);e.target.value="";
-};
-document.getElementById("resetBtn").onclick=()=>{
-  if(!confirm("Her şey başlangıç sektörlerine sıfırlanacak ve eklediğin şirketler silinecek. Emin misin?"))return;
-  state=seed();ui.openForm=null;render();flash("Sıfırlandı");
 };
 document.getElementById("modalX").onclick=closeChart;
 document.getElementById("modalBg").onclick=closeChart;
