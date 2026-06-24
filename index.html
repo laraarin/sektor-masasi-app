@@ -402,6 +402,33 @@
   .iconbtn.star{font-size:14px}
   .iconbtn.star.on{color:var(--accent)}
 
+  /* ---------- Quant Sinyal paneli ---------- */
+  .sig-strip{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:2px 0 12px;padding:11px 14px;
+    border:1px solid var(--line-cool);border-radius:10px;background:var(--surface);font-family:var(--mono);font-size:12px}
+  .sig-strip .reg{font-weight:700;letter-spacing:.02em}
+  .sig-wbar{flex:1;min-width:140px;height:15px;border-radius:5px;overflow:hidden;display:flex;border:1px solid var(--line-cool)}
+  .sig-wbar .wm{background:rgba(111,162,206,.55)}
+  .sig-wbar .wr{background:rgba(233,165,60,.55)}
+  .sig-strip .leg{color:var(--muted)}
+  .sig-strip .leg b{color:var(--text)}
+  .sig-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .sig-tbl th{position:sticky;top:0;background:var(--surface-2);text-align:right;padding:7px 10px;z-index:1;
+    font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);cursor:pointer;white-space:nowrap}
+  .sig-tbl th.l,.sig-tbl td.l{text-align:left}
+  .sig-tbl td{padding:7px 10px;text-align:right;border-top:1px solid var(--line-cool);font-family:var(--mono);white-space:nowrap}
+  .sig-tbl tr:hover td{background:rgba(127,176,105,.05)}
+  .sig-tk{font-weight:700;color:var(--accent-2);cursor:pointer}
+  .sig-tk:hover{text-decoration:underline}
+  .sig-sec{color:var(--muted);font-family:var(--sans);font-size:11.5px}
+  .sig-pos{color:var(--good)} .sig-neg{color:var(--bad)} .sig-dim{color:var(--faint)}
+  .sig-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--sans)}
+  .sig-b2{background:rgba(127,176,105,.22);color:var(--good)}
+  .sig-b1{background:rgba(127,176,105,.11);color:var(--good)}
+  .sig-b0{background:var(--surface-2);color:var(--muted)}
+  .sig-bn1{background:rgba(210,101,78,.11);color:var(--bad)}
+  .sig-bn2{background:rgba(210,101,78,.22);color:var(--bad)}
+  .sig-empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:13px}
+
   /* ============ LIGHT MODE — Solarized (yumuşak bej / sarı) ============ */
   :root[data-theme="light"]{
     --ground:#fdf6e3;     /* base3 — sayfa zemini */
@@ -457,6 +484,7 @@
   <div class="tools">
     <div class="search"><span>⌕</span><input id="search" type="text" placeholder="Ticker veya sektör ara" aria-label="Ara" /></div>
     <button class="btn primary" id="newsBtn" title="Haber akışı">📰 Haberler</button>
+    <button class="btn primary" id="signalBtn" title="Quant sinyaller — momentum + mean reversion">📊 Sinyal</button>
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
     <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
@@ -490,6 +518,16 @@
     <button class="modal-x" data-close="regime" title="Kapat">✕</button>
     <div class="sheet-head"><h3>📊 Risk İştahı — Rejim & S&amp;P 500 (Son 6 Ay)</h3><div id="regimeMeta" class="regime-meta"></div></div>
     <div class="regime-body" id="regimeBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="signalModal" hidden>
+  <div class="modal-bg" data-close="signal"></div>
+  <div class="modal-card big">
+    <button class="modal-x" data-close="signal" title="Kapat">✕</button>
+    <div class="sheet-head"><h3>📊 Quant Sinyal — Momentum &amp; Mean Reversion</h3><div id="signalControls" class="sheet-controls"></div></div>
+    <div id="signalStrip"></div>
+    <div class="sheet-body" id="signalBody"></div>
   </div>
 </div>
 
@@ -572,13 +610,14 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",signalFile:"sinyal.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
 let newsData=null;  // haberler.json (salt-okunur, Actions üretir)
 let regimeData=null, regimeCommit=null;  // rejim.json (Risk İştahı rejim bantları, Actions üretir)
 let regimeChartUrl=null, regimeChartCommit=null;  // rejim_spx.png (rozete tıklayınca açılan grafik)
+let signalData=null, signalCommit=null;  // sinyal.json (momentum + mean reversion quant skorları)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -655,6 +694,13 @@ async function ghLoadRegimeChart(){
   regimeChartUrl=URL.createObjectURL(blob);
   regimeChartCommit=await ghLatestCommit(GH.regimeChartFile);
 }
+async function ghLoadSignal(){
+  const r=await ghApi("/contents/"+GH.signalFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.tickers)signalData=d;}
+  signalCommit=await ghLatestCommit(GH.signalFile);
+}
 async function ghLatestCommit(path){try{const r=await ghApi("/commits?path="+encodeURIComponent(path)+"&sha="+GH.branch+"&per_page=1&_="+Date.now(),{headers:ghHeaders(),cache:"no-store"});if(!r.ok)return null;const a=await r.json();return (a&&a[0])?a[0].sha:null;}catch(e){return null;}}
 async function ghSaveData(){
   if(!ghReady()){pendingWrite=false;return;}
@@ -694,6 +740,8 @@ function startGitPoll(){
       if(rc&&rc!==regimeCommit){await ghLoadRegime();render(true);flash("Risk rejimi güncellendi");}
       const rcc=await ghLatestCommit(GH.regimeChartFile);
       if(rcc&&rcc!==regimeChartCommit){await ghLoadRegimeChart();if(!document.getElementById("regimeModal").hidden)renderRegimeModal();}
+      const sc=await ghLatestCommit(GH.signalFile);
+      if(sc&&sc!==signalCommit){await ghLoadSignal();render(true);flash("Quant sinyalleri güncellendi");}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -725,7 +773,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadSignal();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -1662,6 +1710,68 @@ function toggleTheme(){
 }
 document.getElementById("themeBtn").onclick=toggleTheme;
 syncThemeBtn();
+
+/* ---------- Quant Sinyal paneli ---------- */
+let signalSort={key:"composite",dir:-1};
+function openSignalModal(){
+  document.getElementById("signalModal").hidden=false;
+  renderSignalModal();
+  if(!signalData&&ghReady()){ghLoadSignal().then(()=>{if(!document.getElementById("signalModal").hidden)renderSignalModal();}).catch(()=>{});}
+}
+function closeSignalModal(){document.getElementById("signalModal").hidden=true;}
+function sigBadgeClass(s){return {"Güçlü Al":"sig-b2","Al":"sig-b1","Nötr":"sig-b0","Sat":"sig-bn1","Güçlü Sat":"sig-bn2"}[s]||"sig-b0";}
+function fmtSigned(v,d){return (v>=0?"+":"")+Number(v).toFixed(d);}
+function renderSignalModal(){
+  const strip=document.getElementById("signalStrip"),body=document.getElementById("signalBody");
+  if(!signalData||!signalData.tickers){
+    strip.innerHTML="";
+    body.innerHTML=`<div class="sig-empty">Sinyal verisi yok. GitHub'a bağlan; sinyaller her gün otomatik üretilir (elle: Actions → "Sinyal Güncelle" → Run workflow).</div>`;
+    return;
+  }
+  const rg=signalData.regime||{};
+  const stCol=REGIME_COL[rg.state!=null?rg.state:1];
+  const wm=rg.w_mom||0,wr=rg.w_rev||0,tot=(wm+wr)||1;
+  const mp=Math.round(wm/tot*100),rp=100-mp;
+  let upd="";if(signalData.updated){try{upd=new Date(signalData.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}
+  strip.innerHTML=`<div class="sig-strip">
+    <span class="reg" style="color:${stCol}">${esc(rg.name||"—")}</span>
+    <span class="leg">Ağırlık</span>
+    <div class="sig-wbar" title="Momentum %${mp} / Reversiyon %${rp}"><div class="wm" style="width:${mp}%"></div><div class="wr" style="width:${rp}%"></div></div>
+    <span class="leg">Momentum <b>%${mp}</b> · Reversiyon <b>%${rp}</b> · Brüt <b>%${Math.round((rg.gross||0)*100)}</b></span>
+    <span class="leg sig-dim" style="margin-left:auto">${signalData.universe||0} hisse · ${esc(upd)}</span>
+  </div>`;
+  const rows=Object.keys(signalData.tickers).map(t=>Object.assign({t},signalData.tickers[t]));
+  const k=signalSort.key,dir=signalSort.dir;
+  rows.sort((a,b)=>{
+    if(k==="t")return a.t.localeCompare(b.t)*dir;
+    const va=(a[k]==null?-Infinity:a[k]),vb=(b[k]==null?-Infinity:b[k]);return (va-vb)*dir;
+  });
+  const arrow=key=>signalSort.key===key?(dir<0?" ▼":" ▲"):"";
+  const hdr=(key,lbl,cls)=>`<th class="${cls||''}" data-sk="${key}">${lbl}${arrow(key)}</th>`;
+  let html=`<table class="sig-tbl"><thead><tr>
+    <th class="l">#</th>${hdr("t","Hisse","l")}<th class="l">Sektör</th>
+    ${hdr("mom_pct","Mom %")}${hdr("mom_z","Mom z")}${hdr("rev_z","Rev z")}${hdr("composite","Bileşik")}
+    <th>Sinyal</th></tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const sec=tickerSectorName(r.t);
+    const momp=r.mom_pct!=null?`<span class="${r.mom_pct>=0?'sig-pos':'sig-neg'}">${fmtSigned(r.mom_pct,1)}%</span>`:'<span class="sig-dim">—</span>';
+    const momz=r.mom_z!=null?`<span class="${r.mom_z>=0?'sig-pos':'sig-neg'}">${fmtSigned(r.mom_z,2)}</span>`:'<span class="sig-dim">—</span>';
+    const revz=r.rev_z!=null?`<span class="${r.rev_z>=0?'sig-pos':'sig-neg'}">${fmtSigned(r.rev_z,2)}</span>`:'<span class="sig-dim">—</span>';
+    const comp=`<b class="${r.composite>=0?'sig-pos':'sig-neg'}">${fmtSigned(r.composite,2)}</b>`;
+    html+=`<tr><td class="l sig-dim">${i+1}</td>
+      <td class="l"><span class="sig-tk" data-sigtk="${esc(r.t)}">${esc(r.t)}</span></td>
+      <td class="l sig-sec">${esc(sec||"")}</td>
+      <td>${momp}</td><td>${momz}</td><td>${revz}</td><td>${comp}</td>
+      <td><span class="sig-badge ${sigBadgeClass(r.signal)}">${esc(r.signal)}</span></td></tr>`;
+  });
+  html+=`</tbody></table>`;
+  body.innerHTML=html;
+  body.querySelectorAll("th[data-sk]").forEach(th=>th.onclick=()=>{const key=th.dataset.sk;if(signalSort.key===key)signalSort.dir*=-1;else{signalSort.key=key;signalSort.dir=(key==="t")?1:-1;}renderSignalModal();});
+  body.querySelectorAll("[data-sigtk]").forEach(el=>el.onclick=()=>{const t=el.dataset.sigtk;closeSignalModal();openChart(t);});
+}
+document.getElementById("signalBtn").onclick=openSignalModal;
+document.querySelectorAll('[data-close="signal"]').forEach(el=>el.onclick=closeSignalModal);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("signalModal").hidden)closeSignalModal();});
 document.querySelectorAll('[data-close="news"]').forEach(el=>el.onclick=closeNews);
 document.querySelectorAll('[data-close="reports"]').forEach(el=>el.onclick=closeReports);
 document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeRegimeModal);
@@ -1673,7 +1783,7 @@ async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadSignal();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
