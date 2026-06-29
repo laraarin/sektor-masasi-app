@@ -888,7 +888,8 @@ async function disconnect(){
 }
 
 /* ---------- market data (read-only feed from Python script) ---------- */
-function fmtMC(v){if(!v)return "";const a=Math.abs(v);if(a>=1e12)return "$"+(v/1e12).toFixed(2)+"T";if(a>=1e9)return "$"+(v/1e9).toFixed(1)+"B";if(a>=1e6)return "$"+(v/1e6).toFixed(0)+"M";return "$"+Math.round(v);}
+function ccySym(q){const c=q&&q.ccy;return c==="TRY"?"₺":(c==="EUR"?"€":"$");}
+function fmtMC(v,sym){if(!v)return "";sym=sym||"$";const a=Math.abs(v);if(a>=1e12)return sym+(v/1e12).toFixed(2)+"T";if(a>=1e9)return sym+(v/1e9).toFixed(1)+"B";if(a>=1e6)return sym+(v/1e6).toFixed(0)+"M";return sym+Math.round(v);}
 async function readPriceFile(){
   const f=await priceHandle.getFile();priceLastMod=f.lastModified;
   const t=(await f.text()).trim();
@@ -1013,6 +1014,7 @@ function drawAxisChart(cv,hist,range){
   const rn=(RANGES.find(r=>r[0]===range)||RANGES[3])[1];
   const closes=hist.c.slice(-rn),dates=hist.d.slice(-rn),n=closes.length;
   if(n<2)return;
+  const csym=ccySym(quoteOf(cv.dataset.spark));
   const padL=46,padR=8,padT=8,padB=20;
   const mn=Math.min(...closes),mx=Math.max(...closes),rng=(mx-mn)||1;
   const X=i=>padL+(i/(n-1))*(W-padL-padR);
@@ -1027,7 +1029,7 @@ function drawAxisChart(cv,hist,range){
   for(let k=0;k<=yl;k++){
     const v=mn+rng*k/yl,y=Y(v);
     ctx.strokeStyle=gridCol(false);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
-    ctx.fillStyle="#6b7480";ctx.fillText("$"+(v>=100?v.toFixed(0):v.toFixed(1)),padL-5,y);
+    ctx.fillStyle="#6b7480";ctx.fillText(csym+(v>=100?v.toFixed(0):v.toFixed(1)),padL-5,y);
   }
   // alan dolgusu
   ctx.beginPath();ctx.moveTo(X(0),H-padB);
@@ -1069,7 +1071,7 @@ function renderChart(){
   const mn=Math.min(...closes),mx=Math.max(...closes),up=last>=first;
   const chg=q.changePct;
   document.getElementById("modalHead").innerHTML=`<div class="mh-t"><b>${esc(t)}</b> <span class="mh-n">${esc(nm)}</span></div>
-    <div class="mh-px">$${Number(q.price).toFixed(2)} <span class="chg ${chg>0?'up':(chg<0?'down':'')}">${chg>0?'+':''}${chg!=null?chg.toFixed(2):'0.00'}%</span></div>`;
+    <div class="mh-px">${ccySym(q)}${Number(q.price).toFixed(2)} <span class="chg ${chg>0?'up':(chg<0?'down':'')}">${chg>0?'+':''}${chg!=null?chg.toFixed(2):'0.00'}%</span></div>`;
   document.getElementById("modalRange").innerHTML=RANGES.map(r=>`<button class="rbtn ${chartState.range===r[0]?'on':''}" data-r="${r[0]}">${r[0]}</button>`).join("");
   document.querySelectorAll("#modalRange .rbtn").forEach(b=>b.onclick=()=>{chartState.range=b.dataset.r;renderChart();});
   drawSeries(document.getElementById("chartCanvas"),closes,{fill:true,dot:true,lw:1.8,pad:8,color:up?C_GOOD:C_BAD,dates:dates});
@@ -1079,7 +1081,7 @@ function renderChart(){
     <b style="color:${REGIME_COL[1]}">●</b> Nötr
     <b style="color:${REGIME_COL[2]}">●</b> Risk-Off</span>`:"";
   document.getElementById("modalFoot").innerHTML=`<span class="mf ${cc}">${chartState.range} getirisi <b>${ret>0?'+':''}${ret.toFixed(1)}%</b></span>
-    <span class="mf">En düşük <b>$${mn.toFixed(2)}</b></span><span class="mf">En yüksek <b>$${mx.toFixed(2)}</b></span>
+    <span class="mf">En düşük <b>${ccySym(q)}${mn.toFixed(2)}</b></span><span class="mf">En yüksek <b>${ccySym(q)}${mx.toFixed(2)}</b></span>
     <span class="mf dim">${esc(dates[0])} → ${esc(dates[dates.length-1])}</span>${regimeLegend}`;
 }
 
@@ -1420,7 +1422,7 @@ function coRow(sec,c){
   const spark=(ui.sectorFilter.size>=2&&hasHist)?`<canvas class="spark" data-spark="${esc(c.ticker)}" data-chart="${esc(c.ticker)}" width="150" height="36"></canvas>`:"";
   const band=(q&&q.size)?q.size:c.size;
   const sizeTag=band?`<span class="size-tag">${esc(band)}</span>`:"";
-  const mcTag=(q&&q.marketCap)?`<span class="mc-tag" title="Piyasa değeri">${fmtMC(q.marketCap)}</span>`:"";
+  const mcTag=(q&&q.marketCap)?`<span class="mc-tag" title="Piyasa değeri">${fmtMC(q.marketCap,ccySym(q))}</span>`:"";
   const ncnt=newsCountFor(c.ticker);
   const nb=ncnt?`<span class="news-badge" data-news="${esc(c.ticker)}" title="${ncnt} haber — aç">📰 ${ncnt}</span>`:"";
   const rcnt=reportCountFor(c.ticker);
@@ -1432,16 +1434,16 @@ function coRow(sec,c){
     const chg=q.changePct;
     const cls=chg>0?"up":(chg<0?"down":"");
     const chgTxt=(chg!=null)?` <span class="chg ${cls}">${chg>0?"+":""}${chg.toFixed(2)}%</span>`:"";
-    px=`<span class="px">$${Number(q.price).toFixed(2)}${chgTxt}</span>`;
+    px=`<span class="px">${ccySym(q)}${Number(q.price).toFixed(2)}${chgTxt}</span>`;
   }
   let metrics="";
   if(q){
     const p=[];
     if(q.pe!=null)p.push(`<span class="m">F/K <b>${q.pe.toFixed(1)}</b></span>`);
     if(q.fwdPe!=null)p.push(`<span class="m">İleri F/K <b>${q.fwdPe.toFixed(1)}</b></span>`);
-    if(q.ebitda!=null)p.push(`<span class="m">EBITDA <b>${fmtMC(q.ebitda)}</b></span>`);
+    if(q.ebitda!=null)p.push(`<span class="m">EBITDA <b>${fmtMC(q.ebitda,ccySym(q))}</b></span>`);
     if(q.epsG!=null){const c2=q.epsG>0?"up":(q.epsG<0?"down":"");p.push(`<span class="m">EPS büy. <b class="${c2}">${q.epsG>0?"+":""}${q.epsG.toFixed(0)}%</b></span>`);}
-    if(q.target!=null){const up=q.upside;const c3=(up>0)?"up":(up<0?"down":"");const ut=(up!=null)?` <span class="chg ${c3}">${up>0?"+":""}${up.toFixed(0)}%</span>`:"";p.push(`<span class="m">Hedef <b>$${q.target.toFixed(2)}</b>${ut}</span>`);}
+    if(q.target!=null){const up=q.upside;const c3=(up>0)?"up":(up<0?"down":"");const ut=(up!=null)?` <span class="chg ${c3}">${up>0?"+":""}${up.toFixed(0)}%</span>`:"";p.push(`<span class="m">Hedef <b>${ccySym(q)}${q.target.toFixed(2)}</b>${ut}</span>`);}
     if(q.analysts)p.push(`<span class="m" title="${esc(q.rec||"")}">${q.analysts} analist</span>`);
     if(p.length)metrics=`<div class="metrics">${p.join("")}</div>`;
   }
