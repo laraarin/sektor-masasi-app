@@ -387,6 +387,8 @@
   .fon-chip .fc-tk{font-family:var(--mono);font-weight:650;color:var(--accent-2)}
   .fon-gap-grp{margin-bottom:12px}
   .fon-gap-grp .fg-sec{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  .fon-corr-badge{font-family:var(--mono);font-size:11px;border:1px solid;border-radius:5px;padding:1px 6px;margin-right:8px}
+  .fon-sub-lbl{color:var(--faint);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px}
   .fon-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
   /* fon dağılım grafikleri (donut) */
   .fon-donuts{display:flex;gap:30px;flex-wrap:wrap;justify-content:center;margin:8px 0 2px}
@@ -1678,6 +1680,19 @@ function renderFon(){
       <span class="fb-track"><span class="fb-fill" style="width:${Math.min(100,w/maxw*100)}%"></span></span>
       <span class="fb-pct">%${w.toFixed(1)}</span></div>`).join("");
   }else html+=`<div class="fon-empty" style="padding:14px">Bu fonda eşleşen sektör maruziyeti yok.</div>`;
+
+  // --- korelasyon grupları (son ~3 ay, birlikte hareket edenler) ---
+  const corr=fonData.correlation;
+  if(corr&&corr.groups&&corr.groups.length){
+    html+=`<div class="fon-sec-h">🔗 Birlikte Hareket Eden Gruplar <span class="fon-sub-lbl">· ${esc(corr.window||"")}</span></div>`;
+    html+=corr.groups.map((g,i)=>{
+      const col=FON_COLORS[i%FON_COLORS.length];
+      return `<div class="fon-gap-grp"><div class="fg-sec"><span class="fon-corr-badge" style="border-color:${col};color:${col}">r≈${Number(g.avg).toFixed(2)}</span>${g.tickers.length} hisse birlikte</div>`+
+        g.tickers.map(t=>`<span class="fon-chip"><span class="fc-tk">${esc(t)}</span></span>`).join("")+`</div>`;
+    }).join("");
+    if(corr.singles&&corr.singles.length)
+      html+=`<div class="fg-sec" style="margin:2px 0 10px">Tek başına hareket edenler: <span style="color:var(--muted)">${corr.singles.map(esc).join(", ")}</span></div>`;
+  }
 
   // --- pozisyonlar (hisse) ---
   let hold=(fonData.holdings||[]).filter(h=>h.kind==="equity");
