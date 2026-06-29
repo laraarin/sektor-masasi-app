@@ -570,7 +570,7 @@
     <div class="fl-card">
       <div class="fl-ic">🔒</div>
       <div class="fl-t">Fon Portföyü — Korumalı</div>
-      <div class="fl-s">Devam etmek için şifreyi gir.</div>
+      <div class="fl-s">GitHub bağlantısı (token) + şifre gerekir.</div>
       <input id="fonPass" type="password" inputmode="text" autocomplete="off" placeholder="••••••" aria-label="Şifre" />
       <button class="btn primary fl-go" id="fonPassGo">Giriş</button>
       <div class="fl-err" id="fonPassErr"></div>
@@ -718,10 +718,11 @@ async function ghLoadRegime(){
 }
 async function ghLoadFon(){
   const r=await ghApi("/contents/"+GH.fonFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
-  if(!r.ok)return;
+  if(!r.ok)return false;
   const txt=await r.text();
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.holdings)fonData=d;}
   fonCommit=await ghLatestCommit(GH.fonFile);
+  return true;
 }
 async function ghLoadRegimeChart(){
   const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
@@ -1545,25 +1546,33 @@ function closeNews(){document.getElementById("newsModal").hidden=true;}
 /* ---------- Fon Portföyü (BVV / BTK) ---------- */
 const FON_PASS="BV888";
 function fonUnlocked(){try{return sessionStorage.getItem("sm-fon-unlock")==="1";}catch(e){return false;}}
-function openFon(){document.getElementById("fonModal").hidden=false;if(fonUnlocked())showFonContent();else showFonLock();}
+// İki katman: (1) private repoyu okuyabilen geçerli PAT token, (2) BV888 şifresi.
+function openFon(){document.getElementById("fonModal").hidden=false;if(fonUnlocked()&&ghReady())showFonContent();else showFonLock();}
 function closeFon(){document.getElementById("fonModal").hidden=true;}
+function fonErr(msg){
+  const inp=document.getElementById("fonPass"),err=document.getElementById("fonPassErr");
+  err.textContent=msg;inp.classList.add("bad");setTimeout(()=>inp.classList.remove("bad"),400);
+}
 function showFonLock(){
   document.getElementById("fonBody").hidden=true;
   document.getElementById("fonControls").innerHTML="";
   document.getElementById("fonLock").hidden=false;
-  const inp=document.getElementById("fonPass");inp.value="";
+  const inp=document.getElementById("fonPass");inp.value="";inp.disabled=false;
   document.getElementById("fonPassErr").textContent="";
+  document.getElementById("fonPassGo").disabled=false;
   setTimeout(()=>inp.focus(),30);
 }
-function tryFonPass(){
-  const inp=document.getElementById("fonPass");
-  if((inp.value||"")===FON_PASS){
-    try{sessionStorage.setItem("sm-fon-unlock","1");}catch(e){}
-    showFonContent();
-  }else{
-    inp.classList.add("bad");document.getElementById("fonPassErr").textContent="Hatalı şifre";
-    setTimeout(()=>inp.classList.remove("bad"),400);inp.select();
-  }
+async function tryFonPass(){
+  const inp=document.getElementById("fonPass"),go=document.getElementById("fonPassGo"),err=document.getElementById("fonPassErr");
+  if((inp.value||"")!==FON_PASS){fonErr("Hatalı şifre");inp.select();return;}
+  if(!ghReady()){fonErr("Geçerli GitHub token gerekli — üstteki bağlantıdan GitHub'a bağlan.");return;}
+  // şifre doğru + token var → token'ın private veriyi gerçekten okuyabildiğini doğrula
+  err.style.color="";err.textContent="Doğrulanıyor…";go.disabled=true;inp.disabled=true;
+  let ok=false;try{ok=await ghLoadFon();}catch(e){ok=false;}
+  go.disabled=false;inp.disabled=false;
+  if(!ok){fonErr("Token geçersiz ya da private repoya erişimi yok.");err.textContent="Token geçersiz ya da private repoya erişimi yok.";return;}
+  try{sessionStorage.setItem("sm-fon-unlock","1");}catch(e){}
+  showFonContent();
 }
 function showFonContent(){
   document.getElementById("fonLock").hidden=true;
