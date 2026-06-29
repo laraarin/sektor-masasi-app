@@ -389,6 +389,22 @@
   .fon-gap-grp .fg-sec{font-size:11.5px;color:var(--muted);margin-bottom:5px}
   .fon-corr-badge{font-family:var(--mono);font-size:11px;border:1px solid;border-radius:5px;padding:1px 6px;margin-right:8px}
   .fon-sub-lbl{color:var(--faint);font-weight:400;text-transform:none;letter-spacing:0;font-size:11px}
+  /* sektör bazında getiri (diverging bar chart) */
+  .fon-retchart{display:flex;gap:14px;overflow-x:auto;padding:8px 2px 6px;align-items:flex-start}
+  .rc-col{flex:0 0 auto;width:112px;text-align:center}
+  .rc-plot{position:relative;height:142px;background:linear-gradient(transparent 70px,var(--line-cool) 70px,var(--line-cool) 72px,transparent 72px)}
+  .rc-bar{position:absolute;left:50%;transform:translateX(-50%);width:44px}
+  .rc-bar.up{background:linear-gradient(180deg,var(--good),rgba(127,176,105,.45));border-radius:4px 4px 0 0}
+  .rc-bar.down{background:linear-gradient(0deg,var(--bad),rgba(210,101,78,.45));border-radius:0 0 4px 4px}
+  .rc-val{font-family:var(--mono);font-size:13px;font-weight:680;margin-top:3px}
+  .rc-val.up{color:var(--good)}.rc-val.down{color:var(--bad)}.rc-val.flat{color:var(--faint)}
+  .rc-name{font-size:11px;color:var(--muted);margin:3px 0 7px;line-height:1.25;min-height:30px}
+  .rc-name .rc-w{display:block;color:var(--faint);font-size:10px;margin-top:2px}
+  .rc-tks{display:flex;flex-direction:column;gap:3px}
+  .rc-tk{font-family:var(--mono);font-size:10px;border:1px solid var(--line-cool);border-radius:4px;padding:2px 5px;display:flex;justify-content:space-between;gap:5px;white-space:nowrap}
+  .rc-tk.up{color:var(--good)}.rc-tk.down{color:var(--bad)}.rc-tk.flat{color:var(--muted)}
+  .rc-tk[data-fon-tk]{cursor:pointer}
+  .rc-tk[data-fon-tk]:hover{border-color:var(--accent-2)}
   .fon-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
   /* fon dağılım grafikleri (donut) */
   .fon-donuts{display:flex;gap:30px;flex-wrap:wrap;justify-content:center;margin:8px 0 2px}
@@ -1602,6 +1618,7 @@ function showFonContent(){
   if(!fonData&&ghReady())ghLoadFon().then(()=>{if(!document.getElementById("fonModal").hidden)renderFon();}).catch(()=>{});
 }
 function fmtTL(v){if(!v)return "0";const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+" Mr₺";if(a>=1e6)return (v/1e6).toFixed(1)+" M₺";if(a>=1e3)return Math.round(v/1e3)+" B₺";return Math.round(v)+" ₺";}
+function shortSec(s){s=(s||"").replace(/\s*\(.*?\)\s*/g,"").trim();return s.length>22?s.slice(0,21)+"…":s;}
 function fonCombinedTotal(){let t=0;for(const k in (fonData.funds||{}))t+=fonData.funds[k].total||0;return t;}
 function fonWeight(h){
   if(fonFund==="ALL"){const ct=fonCombinedTotal();return ct?h.totalTl/ct*100:0;}
@@ -1694,21 +1711,27 @@ function renderFon(){
       html+=`<div class="fg-sec" style="margin:2px 0 10px">Tek başına hareket edenler: <span style="color:var(--muted)">${corr.singles.map(esc).join(", ")}</span></div>`;
   }
 
-  // --- pozisyonlar (hisse) ---
-  let hold=(fonData.holdings||[]).filter(h=>h.kind==="equity");
-  if(fonFund!=="ALL")hold=hold.filter(h=>h.funds&&h.funds[fonFund]);
-  hold=hold.map(h=>({h,w:fonWeight(h)})).sort((a,b)=>b.w-a.w);
-  html+=`<div class="fon-sec-h">Hisse Pozisyonları (${hold.length})</div>`;
-  html+=`<table class="fon-tbl"><thead><tr><th>Ticker</th><th>İsim / Sektör</th><th class="r">Ağırlık</th></tr></thead><tbody>`+
-    hold.map(({h,w})=>{
-      const tracked=!!h.sector;
-      const tkCls="ft-tk"+(tracked?" link":" untracked");
-      const tkAttr=tracked?` data-fon-tk="${esc(h.ticker)}" title="Haberleri aç"`:"";
-      const right=h.sector?esc(h.sector):`<span style="color:var(--faint)">takip edilmiyor</span>`;
-      const nm=h.name?esc(h.name)+" · ":"";
-      return `<tr><td><span class="${tkCls}"${tkAttr}>${esc(h.ticker)}</span><span class="fon-mkt">${esc(h.market)}</span></td>
-        <td>${nm}${right}</td><td class="r">%${w.toFixed(2)}</td></tr>`;
-    }).join("")+`</tbody></table>`;
+  // --- sektör bazında getiri (gruplu diverging bar chart) ---
+  let eq=(fonData.holdings||[]).filter(h=>h.kind==="equity");
+  if(fonFund!=="ALL")eq=eq.filter(h=>h.funds&&h.funds[fonFund]);
+  const grp={};
+  eq.forEach(h=>{const k=h.sector||"Takip edilmiyor";const g=grp[k]||(grp[k]={sec:k,items:[],rets:[]});g.items.push(h);if(h.ret3m!=null)g.rets.push(h.ret3m);});
+  let garr=Object.values(grp).map(g=>{
+    g.avg=g.rets.length?g.rets.reduce((a,b)=>a+b,0)/g.rets.length:null;
+    g.items.sort((a,b)=>((b.ret3m==null?-1e9:b.ret3m)-(a.ret3m==null?-1e9:a.ret3m)));
+    g.w=g.items.reduce((s,h)=>s+fonWeight(h),0);return g;
+  }).filter(g=>g.items.length);
+  garr.sort((a,b)=>((b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg)));
+  const maxAbs=Math.max(1,...garr.map(g=>Math.abs(g.avg||0)));
+  html+=`<div class="fon-sec-h">Sektör Bazında Getiri <span class="fon-sub-lbl">· son ~3 ay, eşit ağırlık ortalama</span></div>`;
+  html+=`<div class="fon-retchart">`+garr.map(g=>{
+    const v=g.avg,has=v!=null,pos=has&&v>=0,bh=has?Math.round(Math.abs(v)/maxAbs*64):0;
+    const bar=has?`<div class="rc-bar ${pos?"up":"down"}" style="height:${bh}px;${pos?"bottom":"top"}:71px"></div>`:"";
+    const val=has?`<div class="rc-val ${pos?"up":"down"}">${pos?"+":""}${v.toFixed(0)}%</div>`:`<div class="rc-val flat">—</div>`;
+    const tks=g.items.map(h=>{const r=h.ret3m,cls=r==null?"flat":(r>=0?"up":"down"),tr=h.sector?` data-fon-tk="${esc(h.ticker)}"`:"";
+      return `<span class="rc-tk ${cls}"${tr} title="${esc(h.ticker)} · ağırlık %${fonWeight(h).toFixed(2)}${r!=null?" · 3ay %"+r:""}"><span>${esc(h.ticker)}</span><span>${r!=null?(r>=0?"+":"")+Math.round(r)+"%":"–"}</span></span>`;}).join("");
+    return `<div class="rc-col"><div class="rc-plot">${bar}</div>${val}<div class="rc-name">${esc(shortSec(g.sec))}<span class="rc-w">%${g.w.toFixed(1)} ağırlık</span></div><div class="rc-tks">${tks}</div></div>`;
+  }).join("")+`</div>`;
 
   // --- hisse dışı varlıklar ---
   let other=(fonData.holdings||[]).filter(h=>h.kind==="other");
