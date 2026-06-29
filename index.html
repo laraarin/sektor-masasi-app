@@ -359,6 +359,35 @@
   /* haber öğeleri */
   .news-item{display:flex;gap:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,.05)}
   .news-item:first-child{border-top:none}
+  /* ---- fon portföyü paneli ---- */
+  .fon-cards{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .fon-card{flex:1;min-width:150px;background:var(--surface);border:1px solid var(--line-cool);border-radius:9px;padding:11px 13px}
+  .fon-card .fc-name{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--faint)}
+  .fon-card .fc-tot{font-size:18px;font-weight:680;margin-top:3px}
+  .fon-card .fc-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .fon-sec-h{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:18px 0 9px}
+  .fon-bar{display:flex;align-items:center;gap:10px;padding:6px 0}
+  .fon-bar .fb-lbl{width:190px;flex:none;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fon-bar .fb-track{flex:1;height:9px;border-radius:5px;background:rgba(255,255,255,.05);overflow:hidden}
+  :root[data-theme="light"] .fon-bar .fb-track{background:rgba(87,79,58,.08)}
+  .fon-bar .fb-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent-2),var(--accent))}
+  .fon-bar .fb-pct{width:54px;flex:none;text-align:right;font-family:var(--mono);font-size:12px;color:var(--text)}
+  .fon-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .fon-tbl th{text-align:left;color:var(--faint);font-weight:550;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--line-cool)}
+  .fon-tbl th.r,.fon-tbl td.r{text-align:right;font-family:var(--mono)}
+  .fon-tbl td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.04)}
+  :root[data-theme="light"] .fon-tbl td{border-bottom-color:rgba(87,79,58,.07)}
+  .fon-tbl tr:hover td{background:rgba(255,255,255,.025)}
+  .fon-tbl .ft-tk{font-family:var(--mono);font-weight:650;color:var(--accent)}
+  .fon-tbl .ft-tk.untracked{color:var(--muted)}
+  .fon-tbl .ft-tk.link{cursor:pointer;text-decoration:underline;text-decoration-color:transparent}
+  .fon-tbl .ft-tk.link:hover{text-decoration-color:currentColor}
+  .fon-mkt{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;color:var(--faint);border:1px solid var(--line-cool);border-radius:4px;padding:1px 5px;margin-left:6px}
+  .fon-chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--line-cool);border-radius:7px;padding:4px 9px;margin:0 6px 6px 0;font-size:12px}
+  .fon-chip .fc-tk{font-family:var(--mono);font-weight:650;color:var(--accent-2)}
+  .fon-gap-grp{margin-bottom:12px}
+  .fon-gap-grp .fg-sec{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  .fon-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
   .news-tk{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent-2);flex:0 0 56px;padding-top:1px}
   .news-main{min-width:0;flex:1}
   .news-title{font-size:13px;color:var(--text);text-decoration:none;line-height:1.4}
@@ -458,6 +487,7 @@
     <div class="search"><span>⌕</span><input id="search" type="text" placeholder="Ticker veya sektör ara" aria-label="Ara" /></div>
     <button class="btn primary" id="newsBtn" title="Haber akışı">📰 Haberler</button>
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
+    <button class="btn primary" id="fonBtn" title="BVV / BTK fon portföyü">💼 Fon Portföyü</button>
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
     <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
     <button class="btn ghost" id="themeBtn" title="Açık / koyu tema">🌙</button>
@@ -508,6 +538,15 @@
     <button class="modal-x" data-close="reports" title="Kapat">✕</button>
     <div class="sheet-head"><h3>📄 Raporlar</h3><div id="reportsControls"></div></div>
     <div class="sheet-body" id="reportsBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="fonModal" hidden>
+  <div class="modal-bg" data-close="fon"></div>
+  <div class="modal-card big">
+    <button class="modal-x" data-close="fon" title="Kapat">✕</button>
+    <div class="sheet-head"><h3>💼 Fon Portföyü — BVV &amp; BTK</h3><div id="fonControls"></div></div>
+    <div class="sheet-body" id="fonBody"></div>
   </div>
 </div>
 
@@ -572,13 +611,14 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
 let newsData=null;  // haberler.json (salt-okunur, Actions üretir)
 let regimeData=null, regimeCommit=null;  // rejim.json (Risk İştahı rejim bantları, Actions üretir)
 let regimeChartUrl=null, regimeChartCommit=null;  // rejim_spx.png (rozete tıklayınca açılan grafik)
+let fonData=null, fonCommit=null, fonFund="ALL";  // fon_portfoy.json (BVV/BTK pozisyonları, fon-portfoy-uret.py üretir)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -647,6 +687,13 @@ async function ghLoadRegime(){
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.segments)regimeData=d;}
   regimeCommit=await ghLatestCommit(GH.regimeFile);
 }
+async function ghLoadFon(){
+  const r=await ghApi("/contents/"+GH.fonFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.holdings)fonData=d;}
+  fonCommit=await ghLatestCommit(GH.fonFile);
+}
 async function ghLoadRegimeChart(){
   const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
   if(!r.ok)return;
@@ -694,6 +741,8 @@ function startGitPoll(){
       if(rc&&rc!==regimeCommit){await ghLoadRegime();render(true);flash("Risk rejimi güncellendi");}
       const rcc=await ghLatestCommit(GH.regimeChartFile);
       if(rcc&&rcc!==regimeChartCommit){await ghLoadRegimeChart();if(!document.getElementById("regimeModal").hidden)renderRegimeModal();}
+      const fc=await ghLatestCommit(GH.fonFile);
+      if(fc&&fc!==fonCommit){await ghLoadFon();if(!document.getElementById("fonModal").hidden)renderFon();flash("Fon portföyü güncellendi");}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -725,7 +774,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -1464,6 +1513,106 @@ function allNewsItems(){
 let newsFilter="";
 function openNews(ticker){newsFilter=ticker||"";document.getElementById("newsModal").hidden=false;renderNews();}
 function closeNews(){document.getElementById("newsModal").hidden=true;}
+/* ---------- Fon Portföyü (BVV / BTK) ---------- */
+function openFon(){document.getElementById("fonModal").hidden=false;renderFon();if(!fonData&&ghReady())ghLoadFon().then(()=>{if(!document.getElementById("fonModal").hidden)renderFon();}).catch(()=>{});}
+function closeFon(){document.getElementById("fonModal").hidden=true;}
+function fmtTL(v){if(!v)return "0";const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+" Mr₺";if(a>=1e6)return (v/1e6).toFixed(1)+" M₺";if(a>=1e3)return Math.round(v/1e3)+" B₺";return Math.round(v)+" ₺";}
+function fonCombinedTotal(){let t=0;for(const k in (fonData.funds||{}))t+=fonData.funds[k].total||0;return t;}
+function fonWeight(h){
+  if(fonFund==="ALL"){const ct=fonCombinedTotal();return ct?h.totalTl/ct*100:0;}
+  return (h.pct&&h.pct[fonFund])||0;
+}
+function fonSecWeight(s){
+  if(fonFund==="ALL"){const ct=fonCombinedTotal();return ct?s.totalTl/ct*100:0;}
+  return (s.pct&&s.pct[fonFund])||0;
+}
+function renderFon(){
+  const body=document.getElementById("fonBody"),ctl=document.getElementById("fonControls");
+  if(!fonData||!fonData.holdings){body.innerHTML=`<div class="fon-empty">Fon portföy verisi yok. GitHub'a bağlan; veriyi <b>fon-portfoy-uret.py</b> ile üret ve push et (BVV/BTK pozisyonları).</div>`;ctl.innerHTML="";return;}
+  const funds=fonData.funds||{};const fundKeys=Object.keys(funds);
+  let upd="";if(fonData.updated){try{upd=new Date(fonData.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}
+  ctl.innerHTML=`<div class="sheet-controls">
+    <select class="minisel" id="fonFundSel">
+      <option value="ALL"${fonFund==="ALL"?" selected":""}>Birleşik (BVV+BTK)</option>
+      ${fundKeys.map(k=>`<option value="${esc(k)}"${fonFund===k?" selected":""}>${esc(k)}</option>`).join("")}
+    </select>
+    <span class="news-meta">${fonData.asOf?("portföy "+esc(fonData.asOf)):""}${upd?(" · güncelleme "+esc(upd)):""}</span></div>`;
+  document.getElementById("fonFundSel").onchange=function(){fonFund=this.value;renderFon();};
+
+  // --- fon özet kartları ---
+  let html=`<div class="fon-cards">`+fundKeys.map(k=>{const f=funds[k];return `<div class="fon-card">
+    <div class="fc-name">${esc(k)}</div>
+    <div class="fc-tot">${fmtTL(f.total)}</div>
+    <div class="fc-sub">hisse %${f.equityPct} · ${f.positions} pozisyon</div></div>`;}).join("")+`</div>`;
+
+  // --- sektör maruziyeti ---
+  const secs=(fonData.bySector||[]).map(s=>({s,w:fonSecWeight(s)})).filter(x=>x.w>0.001).sort((a,b)=>b.w-a.w);
+  const maxw=secs.length?secs[0].w:1;
+  html+=`<div class="fon-sec-h">Sektör Maruziyeti${fonFund!=="ALL"?(" — "+esc(fonFund)):""}</div>`;
+  if(secs.length){
+    html+=secs.map(({s,w})=>`<div class="fon-bar">
+      <span class="fb-lbl" title="${esc(s.sector)} · ${esc((s.tickers||[]).join(", "))}">${esc(s.sector)}</span>
+      <span class="fb-track"><span class="fb-fill" style="width:${Math.min(100,w/maxw*100)}%"></span></span>
+      <span class="fb-pct">%${w.toFixed(1)}</span></div>`).join("");
+  }else html+=`<div class="fon-empty" style="padding:14px">Bu fonda eşleşen sektör maruziyeti yok.</div>`;
+
+  // --- pozisyonlar (hisse) ---
+  let hold=(fonData.holdings||[]).filter(h=>h.kind==="equity");
+  if(fonFund!=="ALL")hold=hold.filter(h=>h.funds&&h.funds[fonFund]);
+  hold=hold.map(h=>({h,w:fonWeight(h)})).sort((a,b)=>b.w-a.w);
+  html+=`<div class="fon-sec-h">Hisse Pozisyonları (${hold.length})</div>`;
+  html+=`<table class="fon-tbl"><thead><tr><th>Ticker</th><th>İsim / Sektör</th><th class="r">Ağırlık</th></tr></thead><tbody>`+
+    hold.map(({h,w})=>{
+      const tracked=!!h.sector;
+      const tkCls="ft-tk"+(tracked?" link":" untracked");
+      const tkAttr=tracked?` data-fon-tk="${esc(h.ticker)}" title="Haberleri aç"`:"";
+      const right=h.sector?esc(h.sector):`<span style="color:var(--faint)">takip edilmiyor</span>`;
+      const nm=h.name?esc(h.name)+" · ":"";
+      return `<tr><td><span class="${tkCls}"${tkAttr}>${esc(h.ticker)}</span><span class="fon-mkt">${esc(h.market)}</span></td>
+        <td>${nm}${right}</td><td class="r">%${w.toFixed(2)}</td></tr>`;
+    }).join("")+`</tbody></table>`;
+
+  // --- hisse dışı varlıklar ---
+  let other=(fonData.holdings||[]).filter(h=>h.kind==="other");
+  if(fonFund!=="ALL")other=other.filter(h=>h.funds&&h.funds[fonFund]);
+  if(other.length){
+    other=other.map(h=>({h,w:fonWeight(h)})).sort((a,b)=>b.w-a.w);
+    html+=`<div class="fon-sec-h">Hisse Dışı Varlıklar (nakit / fon / kira sert.)</div>`;
+    html+=`<table class="fon-tbl"><tbody>`+other.map(({h,w})=>`<tr>
+      <td><span class="ft-tk untracked">${esc(h.ticker)}</span></td>
+      <td style="color:var(--muted)">${esc(h.type||"")}</td>
+      <td class="r">%${w.toFixed(2)}</td></tr>`).join("")+`</tbody></table>`;
+  }
+
+  // --- boşluk analizi ---
+  const g=fonData.gaps||{};
+  html+=`<div class="fon-sec-h">🎯 Boşluk Analizi</div>`;
+  // takipte olup portföyde olmayanlar (alınabilecekler), sektöre göre
+  const tnh=g.trackedNotHeld||[];
+  if(tnh.length){
+    const bySec={};tnh.forEach(x=>{(bySec[x.sector]=bySec[x.sector]||[]).push(x);});
+    html+=`<div class="fon-gap-grp"><div class="fg-sec"><b style="color:var(--accent)">Takip listende olup portföyde olmayan</b> — alınabilecek adaylar (${tnh.length})</div>`;
+    html+=Object.keys(bySec).sort().map(sec=>`<div style="margin:6px 0"><div class="fg-sec">${esc(sec)}</div>`+
+      bySec[sec].map(x=>`<span class="fon-chip"><span class="fc-tk">${esc(x.ticker)}</span>${x.name?esc(x.name):""}</span>`).join("")+`</div>`).join("");
+    html+=`</div>`;
+  }
+  // portföyde olup takip edilmeyenler
+  const hnt=(g.heldNotTracked||[]).slice().sort((a,b)=>(b.totalTl||0)-(a.totalTl||0));
+  if(hnt.length){
+    html+=`<div class="fon-gap-grp"><div class="fg-sec"><b style="color:var(--accent-2)">Portföyde olup takip etmediklerin</b> — takibe alınabilir (${hnt.length})</div>`;
+    html+=hnt.map(x=>`<span class="fon-chip"><span class="fc-tk">${esc(x.ticker)}</span><span class="fon-mkt">${esc(x.market)}</span> ${fmtTL(x.totalTl)}</span>`).join("");
+    html+=`</div>`;
+  }
+  // hiç maruziyet olmayan sektörler
+  const es=g.emptySectors||[];
+  if(es.length){
+    html+=`<div class="fon-gap-grp"><div class="fg-sec"><b>Hiç maruziyet olmayan sektörler</b> (${es.length})</div>`;
+    html+=es.map(s=>`<span class="fon-chip">${esc(s)}</span>`).join("")+`</div>`;
+  }
+
+  body.innerHTML=html;
+  body.querySelectorAll("[data-fon-tk]").forEach(el=>el.onclick=()=>{closeFon();openNews(el.getAttribute("data-fon-tk"));});
+}
 /* ---------- Risk İştahı grafiği (rozete tıklayınca) ---------- */
 function openRegimeModal(){
   document.getElementById("regimeModal").hidden=false;
@@ -1648,6 +1797,7 @@ function wireReportForm(){
 }
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
+document.getElementById("fonBtn").onclick=openFon;
 document.getElementById("riskBadge").onclick=openRegimeModal;
 function currentTheme(){return document.documentElement.dataset.theme==="light"?"light":"dark";}
 function syncThemeBtn(){const b=document.getElementById("themeBtn");if(b)b.textContent=currentTheme()==="light"?"☀":"🌙";}
@@ -1666,15 +1816,16 @@ syncThemeBtn();
 document.querySelectorAll('[data-close="news"]').forEach(el=>el.onclick=closeNews);
 document.querySelectorAll('[data-close="reports"]').forEach(el=>el.onclick=closeReports);
 document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeRegimeModal);
+document.querySelectorAll('[data-close="fon"]').forEach(el=>el.onclick=closeFon);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
-document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();});
 
 /* ---------- startup ---------- */
 async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
