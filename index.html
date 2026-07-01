@@ -1,4 +1,7 @@
 <meta charset="utf-8" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Prizma</title>
 <style>
   :root{
@@ -393,6 +396,8 @@
   .fon-retmode{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}
   .fon-retmode .rmbtn{background:var(--surface);border:1px solid var(--line-cool);color:var(--muted);border-radius:6px;padding:2px 8px;font-size:10.5px;font-family:var(--sans);cursor:pointer;text-transform:none;letter-spacing:0}
   .fon-retmode .rmbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(233,165,60,.1)}
+  .fon-sub-lbl .up,.rc-name .up{color:var(--good)}
+  .fon-sub-lbl .down,.rc-name .down{color:var(--bad)}
   .fon-retchart{display:flex;gap:14px;overflow-x:auto;padding:8px 2px 6px;align-items:flex-start}
   .rc-col{flex:0 0 auto;width:112px;text-align:center}
   .rc-plot{position:relative;height:142px;background:linear-gradient(transparent 70px,var(--line-cool) 70px,var(--line-cool) 72px,transparent 72px)}
@@ -1669,7 +1674,10 @@ function fonReturnGroups(){
     const rs=g.items.map(fonHoldRet).filter(v=>v!=null);
     g.avg=rs.length?rs.reduce((a,b)=>a+b,0)/rs.length:null;
     g.items.sort((a,b)=>{const ra=fonHoldRet(a),rb=fonHoldRet(b);return (rb==null?-1e9:rb)-(ra==null?-1e9:ra);});
-    g.w=g.items.reduce((s,h)=>s+fonWeight(h),0);return g;
+    g.w=g.items.reduce((s,h)=>s+fonWeight(h),0);
+    // portföye katkı (puan) = Σ ağırlık% × getiri% / 100
+    g.contrib=g.items.reduce((s,h)=>{const r=fonHoldRet(h);return s+(r!=null?fonWeight(h)*r/100:0);},0);
+    return g;
   }).filter(g=>g.items.length);
   garr.sort((a,b)=>((b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg)));
   return garr;
@@ -1695,9 +1703,10 @@ function fonPrintSummary(){
     <div><span>Fon(lar)</span><b>${esc(keys.join(", "))}</b></div></div>`;
   const modeLbl=FON_RET_LBL[fonRetMode];
   const retHdr={cost:"Alış Getirisi","1w":"1 Hafta Getiri","1m":"1 Ay Getiri","3m":"3 Ay Getiri"}[fonRetMode];
-  html+=`<h2>Sektör Bazında Getiri (${modeLbl}, eşit ağırlık)</h2>
-    <table class="fp-tbl"><thead><tr><th>Sektör</th><th class="r">Ağırlık</th><th class="r">Ort. Getiri</th><th>Hisseler</th></tr></thead><tbody>`+
-    garr.map(g=>`<tr><td>${esc(g.sec)}</td><td class="r">%${g.w.toFixed(1)}</td><td class="r">${rcell(g.avg)}</td><td class="tks">${g.items.map(h=>esc(h.ticker)).join(", ")}</td></tr>`).join("")+
+  const totC=garr.reduce((s,g)=>s+(g.contrib||0),0);
+  html+=`<h2>Sektör Bazında Getiri (${modeLbl}) — portföye katkı toplamı ${totC>=0?"+":""}${totC.toFixed(2)} puan</h2>
+    <table class="fp-tbl"><thead><tr><th>Sektör</th><th class="r">Ağırlık</th><th class="r">Ort. Getiri</th><th class="r">Katkı (puan)</th><th>Hisseler</th></tr></thead><tbody>`+
+    garr.map(g=>`<tr><td>${esc(g.sec)}</td><td class="r">%${g.w.toFixed(1)}</td><td class="r">${rcell(g.avg)}</td><td class="r"><span class="${(g.contrib||0)>=0?"up":"down"}">${(g.contrib||0)>=0?"+":""}${(g.contrib||0).toFixed(2)}</span></td><td class="tks">${g.items.map(h=>esc(h.ticker)).join(", ")}</td></tr>`).join("")+
     `</tbody></table>`;
   html+=`<h2>En Büyük 15 Pozisyon</h2>
     <table class="fp-tbl"><thead><tr><th>Ticker</th><th>Sektör</th><th class="r">Ağırlık</th><th class="r">${retHdr}</th></tr></thead><tbody>`+
@@ -1805,18 +1814,19 @@ function renderFon(){
   const garr=fonReturnGroups();
   const maxAbs=Math.max(1,...garr.map(g=>Math.abs(g.avg||0)));
   const modeLbl=FON_RET_LBL[fonRetMode],retTag=FON_RET_TAG[fonRetMode];
+  const totContrib=garr.reduce((s,g)=>s+(g.contrib||0),0);
   const rmBtns=[["cost","Alış getirisi"],["1w","1 Hafta"],["1m","1 Ay"],["3m","3 Ay"]]
     .map(m=>`<button class="rmbtn ${fonRetMode===m[0]?"on":""}" data-retmode="${m[0]}">${m[1]}</button>`).join("");
   html+=`<div class="fon-sec-h">Sektör Bazında Getiri
     <span class="fon-retmode">${rmBtns}</span>
-    <span class="fon-sub-lbl">· ${modeLbl}, eşit ağırlık</span></div>`;
+    <span class="fon-sub-lbl">· ${modeLbl} · portföye katkı toplamı <b class="${totContrib>=0?"up":"down"}">${totContrib>=0?"+":""}${totContrib.toFixed(2)} puan</b></span></div>`;
   html+=`<div class="fon-retchart">`+garr.map(g=>{
     const v=g.avg,has=v!=null,pos=has&&v>=0,bh=has?Math.round(Math.abs(v)/maxAbs*64):0;
     const bar=has?`<div class="rc-bar ${pos?"up":"down"}" style="height:${bh}px;${pos?"bottom":"top"}:71px"></div>`:"";
     const val=has?`<div class="rc-val ${pos?"up":"down"}">${pos?"+":""}${v.toFixed(0)}%</div>`:`<div class="rc-val flat">—</div>`;
     const tks=g.items.map(h=>{const r=fonHoldRet(h),cls=r==null?"flat":(r>=0?"up":"down"),tr=h.sector?` data-fon-tk="${esc(h.ticker)}"`:"";
       return `<span class="rc-tk ${cls}"${tr} title="${esc(h.ticker)} · ağırlık %${fonWeight(h).toFixed(2)}${r!=null?" · "+retTag+" %"+r:""}"><span>${esc(h.ticker)}</span><span>${r!=null?(r>=0?"+":"")+Math.round(r)+"%":"–"}</span></span>`;}).join("");
-    return `<div class="rc-col"><div class="rc-plot">${bar}</div>${val}<div class="rc-name">${esc(shortSec(g.sec))}<span class="rc-w">%${g.w.toFixed(1)} ağırlık</span></div><div class="rc-tks">${tks}</div></div>`;
+    return `<div class="rc-col"><div class="rc-plot">${bar}</div>${val}<div class="rc-name">${esc(shortSec(g.sec))}<span class="rc-w">%${g.w.toFixed(1)} ağ · <b class="${(g.contrib||0)>=0?"up":"down"}">${(g.contrib||0)>=0?"+":""}${(g.contrib||0).toFixed(2)}p</b> katkı</span></div><div class="rc-tks">${tks}</div></div>`;
   }).join("")+`</div>`;
 
   // --- hisse dışı varlıklar ---
