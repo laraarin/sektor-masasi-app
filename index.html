@@ -427,10 +427,10 @@
     #fonPrint .fp-kpis{display:flex;gap:28px;margin:12px 0 4px}
     #fonPrint .fp-kpis span{display:block;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.06em}
     #fonPrint .fp-kpis b{font-size:18px}
-    #fonPrint .fp-cols{display:flex;gap:22px;margin:16px 0 4px;align-items:flex-start}
-    #fonPrint .fp-col-donut{flex:0 0 300px}
-    #fonPrint .fp-col-bars{flex:1;min-width:0}
-    #fonPrint .fp-donutwrap{display:flex;gap:12px;align-items:center}
+    #fonPrint .fp-cols{display:flex;gap:24px;margin:10px 0 4px;align-items:flex-start}
+    #fonPrint .fp-col{flex:1;min-width:0}
+    #fonPrint .fp-dist{margin:14px 0 2px}
+    #fonPrint .fp-donutwrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
     #fonPrint .fp-ring{flex:0 0 auto}
     #fonPrint .fp-legend{display:flex;flex-direction:column;gap:3px;font-size:9px}
     #fonPrint .fpl-i{display:flex;align-items:center;gap:5px}
@@ -1716,6 +1716,31 @@ function fonAllocCombined(keys){
   });
   return Object.keys(bySec).map(l=>({label:l,pct:bySec[l]/tot*100})).sort((a,b)=>b.pct-a.pct);
 }
+function fonSectorAvg(retFn){
+  // seçili fona göre sektör bazında verilen getirinin ortalaması + ağırlık
+  let eq=(fonData.holdings||[]).filter(h=>h.kind==="equity");
+  if(fonFund!=="ALL")eq=eq.filter(h=>h.funds&&h.funds[fonFund]);
+  const grp={};
+  eq.forEach(h=>{const k=h.sector||"Takip edilmiyor";const g=grp[k]||(grp[k]={sec:k,rets:[],w:0});const r=retFn(h);if(r!=null)g.rets.push(r);g.w+=fonWeight(h);});
+  return Object.values(grp).map(g=>({sec:g.sec,avg:g.rets.length?g.rets.reduce((a,b)=>a+b,0)/g.rets.length:null,w:g.w}))
+    .filter(g=>g.w>0.01).sort((a,b)=>((b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg)));
+}
+function fonBarSvg(groups){
+  const N=groups.length||1,cw=Math.max(56,Math.min(108,Math.round(720/N))),W=N*cw,H=176,base=104,bmax=80;
+  const maxAbs=Math.max(1,...groups.map(g=>Math.abs(g.avg||0)));
+  let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Arial,sans-serif" style="height:auto">`;
+  s+=`<line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#ccc" stroke-width="1"/>`;
+  groups.forEach((g,i)=>{const v=g.avg,x=i*cw+cw/2;
+    if(v!=null){const h=Math.max(1,Math.round(Math.abs(v)/maxAbs*bmax)),y=v>=0?base-h:base,col=v>=0?"#3aa657":"#c0503a";
+      s+=`<rect x="${(x-cw*0.29).toFixed(1)}" y="${y}" width="${(cw*0.58).toFixed(1)}" height="${h}" rx="3" fill="${col}"/>`;
+      s+=`<text x="${x}" y="${v>=0?y-4:y+h+13}" text-anchor="middle" font-size="12" font-weight="700" fill="${v>=0?"#178a3a":"#b3402a"}">${v>=0?"+":""}${v.toFixed(0)}%</text>`;
+    }else{s+=`<text x="${x}" y="${base-4}" text-anchor="middle" font-size="10" fill="#999">—</text>`;}
+    const nm=shortSec(g.sec),nm2=nm.length>14?nm.slice(0,13)+"…":nm;
+    s+=`<text x="${x}" y="${H-13}" text-anchor="middle" font-size="9" fill="#555">${esc(nm2)}</text>`;
+    s+=`<text x="${x}" y="${H-3}" text-anchor="middle" font-size="8.5" fill="#999">%${g.w.toFixed(0)}</text>`;
+  });
+  return s+`</svg>`;
+}
 function fonPrintSummary(){
   if(!fonData||!fonData.holdings){flash("Önce fon verisini aç");return;}
   const funds=fonData.funds||{};
@@ -1737,33 +1762,20 @@ function fonPrintSummary(){
   alloc.forEach(a=>{a.color=(a.label==="Takipsiz hisse"||a.label==="Nakit / Diğer")?FON_GREY:FON_COLORS[ci++%FON_COLORS.length];});
   const donut=donutSvg(alloc.map(a=>({label:a.label,pct:a.pct,color:a.color})),160);
   const legend=alloc.map(a=>`<div class="fpl-i"><svg class="fpl-sw" width="10" height="10" viewBox="0 0 10 10"><rect width="10" height="10" rx="2" fill="${a.color}"/></svg><span class="fpl-t">${esc(a.label)}</span><b>%${a.pct.toFixed(1)}</b></div>`).join("");
-  // getiri bar chart'ı — SVG (yazdırmada 'arka plan grafikleri' kapalı olsa bile çıkar)
-  const maxAbs=Math.max(1,...garr.map(g=>Math.abs(g.avg||0)));
-  const bars=(function(){
-    const N=garr.length||1,cw=Math.max(64,Math.min(120,Math.round(940/N))),W=N*cw,H=152,base=88,bmax=66;
-    let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Arial,sans-serif" style="height:auto">`;
-    s+=`<line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#ccc" stroke-width="1"/>`;
-    garr.forEach((g,i)=>{const v=g.avg,x=i*cw+cw/2;
-      if(v!=null){const h=Math.max(1,Math.round(Math.abs(v)/maxAbs*bmax)),y=v>=0?base-h:base,col=v>=0?"#3aa657":"#c0503a";
-        s+=`<rect x="${(x-cw*0.28).toFixed(1)}" y="${y}" width="${(cw*0.56).toFixed(1)}" height="${h}" rx="3" fill="${col}"/>`;
-        s+=`<text x="${x}" y="${v>=0?y-4:y+h+13}" text-anchor="middle" font-size="11" font-weight="700" fill="${v>=0?"#178a3a":"#b3402a"}">${v>=0?"+":""}${v.toFixed(0)}%</text>`;
-      }else{s+=`<text x="${x}" y="${base-4}" text-anchor="middle" font-size="10" fill="#999">—</text>`;}
-      const nm=shortSec(g.sec),nm2=nm.length>15?nm.slice(0,14)+"…":nm;
-      s+=`<text x="${x}" y="${H-13}" text-anchor="middle" font-size="8.5" fill="#555">${esc(nm2)}</text>`;
-      s+=`<text x="${x}" y="${H-3}" text-anchor="middle" font-size="8.5" fill="#999">%${g.w.toFixed(0)}</text>`;
-    });
-    return s+`</svg>`;
-  })();
+  // haftalık ve aylık sektör performansı (moddan bağımsız, iki bar chart)
+  const wk=fonSectorAvg(h=>h.ret1w!=null?h.ret1w:null);
+  const mo=fonSectorAvg(h=>h.ret1m!=null?h.ret1m:null);
 
   let html=`<div class="fp-head"><h1>💼 ${esc(title)} — Fon Özeti</h1>
-    <div class="fp-meta">Portföy tarihi: ${esc(fonData.asOf||"")} · Rapor: ${esc(dt)} · Getiri penceresi: ${esc(modeLbl)}</div></div>`;
+    <div class="fp-meta">Portföy tarihi: ${esc(fonData.asOf||"")} · Rapor: ${esc(dt)}</div></div>`;
   html+=`<div class="fp-kpis">
     <div><span>Büyüklük</span><b>${fmtTL(total)}</b></div>
     <div><span>Hisse Oranı</span><b>%${eqPct}</b></div>
-    <div><span>Portföye Katkı</span><b class="${totC>=0?"up":"down"}">${totC>=0?"+":""}${totC.toFixed(2)} puan</b></div></div>`;
+    <div><span>Portföye Katkı (${esc(modeLbl)})</span><b class="${totC>=0?"up":"down"}">${totC>=0?"+":""}${totC.toFixed(2)} puan</b></div></div>`;
+  html+=`<div class="fp-dist"><h3>Sektör Dağılımı</h3><div class="fp-donutwrap"><div class="fp-ring">${donut}</div><div class="fp-legend">${legend}</div></div></div>`;
   html+=`<div class="fp-cols">
-    <div class="fp-col fp-col-donut"><h3>Sektör Dağılımı</h3><div class="fp-donutwrap"><div class="fp-ring">${donut}</div><div class="fp-legend">${legend}</div></div></div>
-    <div class="fp-col fp-col-bars"><h3>Sektör Bazında Getiri (${esc(retHdr)})</h3><div class="fp-bars">${bars}</div></div>
+    <div class="fp-col"><h3>Haftalık Sektör Getirisi (~1 hafta)</h3><div class="fp-bars">${fonBarSvg(wk)}</div></div>
+    <div class="fp-col"><h3>Aylık Sektör Getirisi (~1 ay)</h3><div class="fp-bars">${fonBarSvg(mo)}</div></div>
   </div>`;
   html+=`<h2>Sektör Detayı</h2>
     <table class="fp-tbl"><thead><tr><th>Sektör</th><th class="r">Ağırlık</th><th class="r">${esc(retHdr)}</th><th class="r">Katkı (p)</th></tr></thead><tbody>`+
