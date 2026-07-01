@@ -457,6 +457,18 @@
     #fonPrint tr{page-break-inside:avoid}
   }
   .fon-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
+  /* haftalık sektör bülteni (rotasyon) */
+  .tr-hls{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .tr-hl{font-size:12.5px;line-height:1.5}
+  .tr-hl.pos{color:var(--good)}.tr-hl.neg{color:var(--bad)}
+  .fon-tbl .up,.tr-hl .up{color:var(--good)}
+  .fon-tbl .down,.tr-hl .down{color:var(--bad)}
+  .tr-flip{font-family:var(--mono);font-size:9.5px;border-radius:4px;padding:1px 5px;margin-left:6px;white-space:nowrap}
+  .tr-flip.pos{color:var(--good);border:1px solid var(--good)}
+  .tr-flip.neg{color:var(--bad);border:1px solid var(--bad)}
+  .tr-bar{display:inline-block;width:150px;height:8px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;vertical-align:middle}
+  :root[data-theme="light"] .tr-bar{background:rgba(87,79,58,.08)}
+  .tr-bar i{display:block;height:100%;border-radius:4px}
   /* fon dağılım grafikleri (donut) */
   .fon-dist{display:flex;gap:30px;align-items:center;flex-wrap:wrap;margin:8px 0 2px}
   .fon-donuts{display:flex;gap:30px;flex-wrap:wrap;justify-content:center;flex:1}
@@ -594,6 +606,7 @@
     <div class="search"><span>⌕</span><input id="search" type="text" placeholder="Ticker veya sektör ara" aria-label="Ara" /></div>
     <button class="btn primary" id="newsBtn" title="Haber akışı">📰 Haberler</button>
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
+    <button class="btn primary" id="taramaBtn" title="Haftalık sektör rotasyon taraması">📈 Rotasyon</button>
     <button class="btn primary" id="fonBtn" title="BVV / BTK fon portföyü">💼 Fon Portföyü</button>
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
     <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
@@ -645,6 +658,15 @@
     <button class="modal-x" data-close="reports" title="Kapat">✕</button>
     <div class="sheet-head"><h3>📄 Raporlar</h3><div id="reportsControls"></div></div>
     <div class="sheet-body" id="reportsBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="taramaModal" hidden>
+  <div class="modal-bg" data-close="tarama"></div>
+  <div class="modal-card big">
+    <button class="modal-x" data-close="tarama" title="Kapat">✕</button>
+    <div class="sheet-head"><h3>📈 Haftalık Sektör Bülteni — Rotasyon</h3><div id="taramaMeta" class="regime-meta"></div></div>
+    <div class="sheet-body" id="taramaBody"></div>
   </div>
 </div>
 
@@ -731,7 +753,7 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
@@ -739,6 +761,7 @@ let newsData=null;  // haberler.json (salt-okunur, Actions üretir)
 let regimeData=null, regimeCommit=null;  // rejim.json (Risk İştahı rejim bantları, Actions üretir)
 let regimeChartUrl=null, regimeChartCommit=null;  // rejim_spx.png (rozete tıklayınca açılan grafik)
 let fonData=null, fonCommit=null, fonFund="ALL";  // fon_portfoy.json (BVV/BTK pozisyonları, fon-portfoy-uret.py üretir)
+let taramaData=null, taramaCommit=null;  // sektor-tarama.json (haftalık sektör rotasyon taraması, Actions Çar & Cum üretir)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -815,6 +838,13 @@ async function ghLoadFon(){
   fonCommit=await ghLatestCommit(GH.fonFile);
   return true;
 }
+async function ghLoadTarama(){
+  const r=await ghApi("/contents/"+GH.taramaFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.latest)taramaData=d;}
+  taramaCommit=await ghLatestCommit(GH.taramaFile);
+}
 async function ghLoadRegimeChart(){
   const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
   if(!r.ok)return;
@@ -864,6 +894,8 @@ function startGitPoll(){
       if(rcc&&rcc!==regimeChartCommit){await ghLoadRegimeChart();if(!document.getElementById("regimeModal").hidden)renderRegimeModal();}
       const fc=await ghLatestCommit(GH.fonFile);
       if(fc&&fc!==fonCommit){await ghLoadFon();if(!document.getElementById("fonModal").hidden)renderFon();flash("Fon portföyü güncellendi");}
+      const tc=await ghLatestCommit(GH.taramaFile);
+      if(tc&&tc!==taramaCommit){await ghLoadTarama();if(!document.getElementById("taramaModal").hidden)renderTarama();flash("Sektör taraması güncellendi");}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -895,7 +927,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -1945,6 +1977,43 @@ function renderFon(){
   body.querySelectorAll("[data-fon-fund]").forEach(el=>el.onclick=()=>{const k=el.getAttribute("data-fon-fund");fonFund=(fonFund===k?"ALL":k);renderFon();});
   body.querySelectorAll("[data-retmode]").forEach(el=>el.onclick=()=>{fonRetMode=el.getAttribute("data-retmode");renderFon();});
 }
+/* ---------- Haftalık Sektör Bülteni (Rotasyon) ---------- */
+function openTarama(){document.getElementById("taramaModal").hidden=false;renderTarama();if(!taramaData&&ghReady())ghLoadTarama().then(()=>{if(!document.getElementById("taramaModal").hidden)renderTarama();}).catch(()=>{});}
+function closeTarama(){document.getElementById("taramaModal").hidden=true;}
+function renderTarama(){
+  const body=document.getElementById("taramaBody"),meta=document.getElementById("taramaMeta");
+  if(!taramaData||!taramaData.latest){body.innerHTML=`<div class="fon-empty">Tarama verisi yok. GitHub'a bağlan; tarama Çarşamba & Cuma otomatik koşar (elle: Actions → Sektör Taraması → Run workflow).</div>`;meta.textContent="";return;}
+  const L=taramaData.latest;
+  meta.innerHTML=`${esc(taramaData.asOf||"")}${taramaData.prevDate?` · önceki tarama ${esc(taramaData.prevDate)}`:""} · ${esc(taramaData.benchmark)} 1H %${taramaData.benchRet1w}`;
+  const flipPos=L.filter(s=>s.flip==="pozitife"),flipNeg=L.filter(s=>s.flip==="negatife");
+  const g=L.filter(s=>s.dRet1w!=null).slice().sort((a,b)=>b.dRet1w-a.dRet1w);
+  const up=g.filter(s=>s.dRet1w>0).slice(0,3),down=g.filter(s=>s.dRet1w<0).slice(-3).reverse();
+  const chips=arr=>arr.map(s=>`<span class="fon-chip"><span class="fc-tk">${esc(shortSec(s.name))}</span> ${s.dRet1w>=0?"+":""}${s.dRet1w}p</span>`).join("");
+  let hl="";
+  if(flipPos.length)hl+=`<div class="tr-hl pos">🟢 <b>Pozitife dönenler:</b> ${flipPos.map(s=>esc(shortSec(s.name))).join(", ")}</div>`;
+  if(flipNeg.length)hl+=`<div class="tr-hl neg">🔴 <b>Negatife dönenler:</b> ${flipNeg.map(s=>esc(shortSec(s.name))).join(", ")}</div>`;
+  if(taramaData.prevDate){
+    if(up.length)hl+=`<div class="tr-hl">⬆ <b>İvme kazananlar:</b> ${chips(up)}</div>`;
+    if(down.length)hl+=`<div class="tr-hl">⬇ <b>İvme kaybedenler:</b> ${chips(down)}</div>`;
+    if(!flipPos.length&&!flipNeg.length&&!up.length&&!down.length)hl+=`<div class="fon-sub-lbl">Önceki taramaya göre belirgin rotasyon yok.</div>`;
+  }else hl+=`<div class="tr-hl">İlk tarama — değişim (Δ ivme, sıra, işaret dönüşü) bir sonraki taramada (Çar/Cum) görünecek.</div>`;
+  const maxAbs=Math.max(1,...L.map(s=>Math.abs(s.ret1w)));
+  const rows=L.map(s=>{
+    const pos=s.ret1w>=0,w=Math.min(100,Math.abs(s.ret1w)/maxAbs*100);
+    const bar=`<span class="tr-bar"><i style="width:${w}%;background:${pos?'var(--good)':'var(--bad)'}"></i></span>`;
+    const d=s.dRet1w==null?`<span style="color:var(--faint)">—</span>`:`<span class="${s.dRet1w>=0?'up':'down'}">${s.dRet1w>=0?'+':''}${s.dRet1w}</span>`;
+    const rk=(s.dRank==null||s.dRank===0)?"":(s.dRank>0?`<span class="up">▲${s.dRank}</span>`:`<span class="down">▼${-s.dRank}</span>`);
+    const fl=s.flip?`<span class="tr-flip ${s.flip==='pozitife'?'pos':'neg'}">${s.flip==='pozitife'?'▲ pozitif':'▼ negatif'}</span>`:"";
+    const rel=s.rel1w==null?"":`${s.rel1w>=0?'+':''}${s.rel1w}`;
+    return `<tr><td class="r" style="color:var(--faint);white-space:nowrap">${s.rank} ${rk}</td>
+      <td>${esc(s.name)}${fl}</td><td>${bar}</td>
+      <td class="r"><b class="${pos?'up':'down'}">${pos?'+':''}${s.ret1w}%</b></td>
+      <td class="r">${d}</td><td class="r">%${s.breadth}</td><td class="r">${rel}</td></tr>`;
+  }).join("");
+  body.innerHTML=`<div class="tr-hls">${hl}</div>
+    <table class="fon-tbl"><thead><tr><th class="r">#</th><th>Sektör</th><th>1H getiri</th><th class="r">1H %</th><th class="r">Δ ivme</th><th class="r">Breadth</th><th class="r">vs ${esc(taramaData.benchmark)}</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="fon-sub-lbl" style="margin-top:10px">Δ ivme = bu taramanın 1H getirisi − önceki tarama · Breadth = sektörde artıda olan hisse % · vs ${esc(taramaData.benchmark)} = benchmark'a göre 1H ayrışma. Tarama Çar & Cum otomatik güncellenir.</div>`;
+}
 /* ---------- Risk İştahı grafiği (rozete tıklayınca) ---------- */
 function openRegimeModal(){
   document.getElementById("regimeModal").hidden=false;
@@ -2130,6 +2199,7 @@ function wireReportForm(){
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("fonBtn").onclick=openFon;
+document.getElementById("taramaBtn").onclick=openTarama;
 document.getElementById("fonPrintBtn").onclick=fonPrintSummary;
 document.getElementById("fonPassGo").onclick=tryFonPass;
 document.getElementById("fonPass").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryFonPass();}});
@@ -2152,15 +2222,16 @@ document.querySelectorAll('[data-close="news"]').forEach(el=>el.onclick=closeNew
 document.querySelectorAll('[data-close="reports"]').forEach(el=>el.onclick=closeReports);
 document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeRegimeModal);
 document.querySelectorAll('[data-close="fon"]').forEach(el=>el.onclick=closeFon);
+document.querySelectorAll('[data-close="tarama"]').forEach(el=>el.onclick=closeTarama);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
-document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();});
 
 /* ---------- startup ---------- */
 async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
