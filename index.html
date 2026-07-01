@@ -1651,10 +1651,13 @@ function showFonContent(){
 }
 function fmtTL(v){if(!v)return "0";const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+" Mr₺";if(a>=1e6)return (v/1e6).toFixed(1)+" M₺";if(a>=1e3)return Math.round(v/1e3)+" B₺";return Math.round(v)+" ₺";}
 function shortSec(s){s=(s||"").replace(/\s*\(.*?\)\s*/g,"").trim();return s.length>22?s.slice(0,21)+"…":s;}
-let fonRetMode="cost"; // "cost" = alış maliyetine göre, "mkt" = son ~3 ay piyasa
+let fonRetMode="cost"; // "cost" = alış maliyetine göre, "1w"/"1m"/"3m" = piyasa penceresi
+const FON_RET_LBL={cost:"alış maliyetine göre","1w":"son ~1 hafta piyasa","1m":"son ~1 ay piyasa","3m":"son ~3 ay piyasa"};
+const FON_RET_TAG={cost:"alış","1w":"1hafta","1m":"1ay","3m":"3ay"};
 function fonHoldRet(h){
   if(fonRetMode==="cost"){const cr=h.costRet;if(!cr)return null;return (fonFund!=="ALL"?cr[fonFund]:cr.ALL);}
-  return (h.ret3m!=null?h.ret3m:null);
+  const k=fonRetMode==="1w"?"ret1w":(fonRetMode==="1m"?"ret1m":"ret3m");
+  return (h[k]!=null?h[k]:null);
 }
 function fonReturnGroups(){
   // Seçili fona (fonFund) göre hisseleri sektöre grupla; seçili moda göre getiri + ağırlık.
@@ -1690,8 +1693,8 @@ function fonPrintSummary(){
     <div><span>Büyüklük</span><b>${fmtTL(total)}</b></div>
     <div><span>Hisse Oranı</span><b>%${eqPct}</b></div>
     <div><span>Fon(lar)</span><b>${esc(keys.join(", "))}</b></div></div>`;
-  const modeLbl=fonRetMode==="cost"?"alış maliyetine göre":"son ~3 ay piyasa";
-  const retHdr=fonRetMode==="cost"?"Alış Getirisi":"3 Ay Getiri";
+  const modeLbl=FON_RET_LBL[fonRetMode];
+  const retHdr={cost:"Alış Getirisi","1w":"1 Hafta Getiri","1m":"1 Ay Getiri","3m":"3 Ay Getiri"}[fonRetMode];
   html+=`<h2>Sektör Bazında Getiri (${modeLbl}, eşit ağırlık)</h2>
     <table class="fp-tbl"><thead><tr><th>Sektör</th><th class="r">Ağırlık</th><th class="r">Ort. Getiri</th><th>Hisseler</th></tr></thead><tbody>`+
     garr.map(g=>`<tr><td>${esc(g.sec)}</td><td class="r">%${g.w.toFixed(1)}</td><td class="r">${rcell(g.avg)}</td><td class="tks">${g.items.map(h=>esc(h.ticker)).join(", ")}</td></tr>`).join("")+
@@ -1801,16 +1804,18 @@ function renderFon(){
   // --- sektör bazında getiri (gruplu diverging bar chart) ---
   const garr=fonReturnGroups();
   const maxAbs=Math.max(1,...garr.map(g=>Math.abs(g.avg||0)));
-  const modeLbl=fonRetMode==="cost"?"alış maliyetine göre":"son ~3 ay piyasa";
+  const modeLbl=FON_RET_LBL[fonRetMode],retTag=FON_RET_TAG[fonRetMode];
+  const rmBtns=[["cost","Alış getirisi"],["1w","1 Hafta"],["1m","1 Ay"],["3m","3 Ay"]]
+    .map(m=>`<button class="rmbtn ${fonRetMode===m[0]?"on":""}" data-retmode="${m[0]}">${m[1]}</button>`).join("");
   html+=`<div class="fon-sec-h">Sektör Bazında Getiri
-    <span class="fon-retmode"><button class="rmbtn ${fonRetMode==="cost"?"on":""}" data-retmode="cost">Alış getirisi</button><button class="rmbtn ${fonRetMode==="mkt"?"on":""}" data-retmode="mkt">3 ay piyasa</button></span>
+    <span class="fon-retmode">${rmBtns}</span>
     <span class="fon-sub-lbl">· ${modeLbl}, eşit ağırlık</span></div>`;
   html+=`<div class="fon-retchart">`+garr.map(g=>{
     const v=g.avg,has=v!=null,pos=has&&v>=0,bh=has?Math.round(Math.abs(v)/maxAbs*64):0;
     const bar=has?`<div class="rc-bar ${pos?"up":"down"}" style="height:${bh}px;${pos?"bottom":"top"}:71px"></div>`:"";
     const val=has?`<div class="rc-val ${pos?"up":"down"}">${pos?"+":""}${v.toFixed(0)}%</div>`:`<div class="rc-val flat">—</div>`;
     const tks=g.items.map(h=>{const r=fonHoldRet(h),cls=r==null?"flat":(r>=0?"up":"down"),tr=h.sector?` data-fon-tk="${esc(h.ticker)}"`:"";
-      return `<span class="rc-tk ${cls}"${tr} title="${esc(h.ticker)} · ağırlık %${fonWeight(h).toFixed(2)}${r!=null?" · "+(fonRetMode==="cost"?"alış":"3ay")+" %"+r:""}"><span>${esc(h.ticker)}</span><span>${r!=null?(r>=0?"+":"")+Math.round(r)+"%":"–"}</span></span>`;}).join("");
+      return `<span class="rc-tk ${cls}"${tr} title="${esc(h.ticker)} · ağırlık %${fonWeight(h).toFixed(2)}${r!=null?" · "+retTag+" %"+r:""}"><span>${esc(h.ticker)}</span><span>${r!=null?(r>=0?"+":"")+Math.round(r)+"%":"–"}</span></span>`;}).join("");
     return `<div class="rc-col"><div class="rc-plot">${bar}</div>${val}<div class="rc-name">${esc(shortSec(g.sec))}<span class="rc-w">%${g.w.toFixed(1)} ağırlık</span></div><div class="rc-tks">${tks}</div></div>`;
   }).join("")+`</div>`;
 
