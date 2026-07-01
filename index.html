@@ -418,13 +418,32 @@
   @media print{
     body{background:#fff !important}
     body > *{display:none !important}
-    #fonPrint{display:block !important;color:#111;font-family:Arial,Helvetica,sans-serif}
+    #fonPrint{display:block !important;color:#111;font-family:Arial,Helvetica,sans-serif;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+    #fonPrint .up{color:#178a3a}#fonPrint .down{color:#b3402a}
     #fonPrint .fp-head h1{font-size:20px;margin:0 0 2px}
     #fonPrint .fp-meta{color:#555;font-size:12px}
     #fonPrint h2{font-size:13px;margin:16px 0 6px;border-bottom:1px solid #bbb;padding-bottom:3px}
+    #fonPrint h3{font-size:10.5px;margin:0 0 6px;color:#555;text-transform:uppercase;letter-spacing:.05em}
     #fonPrint .fp-kpis{display:flex;gap:28px;margin:12px 0 4px}
     #fonPrint .fp-kpis span{display:block;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.06em}
     #fonPrint .fp-kpis b{font-size:18px}
+    #fonPrint .fp-cols{display:flex;gap:22px;margin:16px 0 4px;align-items:flex-start}
+    #fonPrint .fp-col-donut{flex:0 0 300px}
+    #fonPrint .fp-col-bars{flex:1;min-width:0}
+    #fonPrint .fp-donutwrap{display:flex;gap:12px;align-items:center}
+    #fonPrint .fp-ring{flex:0 0 auto}
+    #fonPrint .fp-legend{display:flex;flex-direction:column;gap:3px;font-size:9px}
+    #fonPrint .fpl-i{display:flex;align-items:center;gap:5px}
+    #fonPrint .fpl-sw{width:9px;height:9px;border-radius:2px;flex:0 0 auto}
+    #fonPrint .fpl-t{flex:1}
+    #fonPrint .fp-bars{display:flex;gap:5px;align-items:flex-start}
+    #fonPrint .fpb-col{flex:1;text-align:center;min-width:0}
+    #fonPrint .fpb-plot{position:relative;height:112px;background:linear-gradient(transparent 55px,#cfcfcf 55px,#cfcfcf 57px,transparent 57px)}
+    #fonPrint .fpb-bar{position:absolute;left:50%;transform:translateX(-50%);width:58%;border-radius:3px}
+    #fonPrint .fpb-bar.up{background:#3aa657}
+    #fonPrint .fpb-bar.down{background:#c0503a}
+    #fonPrint .fpb-val{font-size:10px;font-weight:700;margin-top:3px}
+    #fonPrint .fpb-name{font-size:8px;color:#666;line-height:1.15;margin-top:2px}
     #fonPrint .fp-tbl{width:100%;border-collapse:collapse;font-size:11px}
     #fonPrint .fp-tbl th{text-align:left;border-bottom:1px solid #999;padding:4px 6px;font-size:9.5px;color:#444;text-transform:uppercase;letter-spacing:.05em}
     #fonPrint .fp-tbl td{padding:4px 6px;border-bottom:1px solid #eee}
@@ -1682,6 +1701,20 @@ function fonReturnGroups(){
   garr.sort((a,b)=>((b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg)));
   return garr;
 }
+function fonAllocCombined(keys){
+  // Seçili kapsamın (tek fon ya da birleşik) sektör dağılımı: sektör + takipsiz + nakit
+  const funds=fonData.funds||{};
+  let tot=0;keys.forEach(k=>{if(funds[k])tot+=funds[k].total||0;});
+  if(!tot)return [];
+  const bySec={};
+  (fonData.holdings||[]).forEach(h=>{
+    let tl=0;keys.forEach(k=>{tl+=(h.funds&&h.funds[k])||0;});
+    if(!tl)return;
+    const label=(h.kind==="equity"&&h.sector)?h.sector:(h.kind==="equity"?"Takipsiz hisse":"Nakit / Diğer");
+    bySec[label]=(bySec[label]||0)+tl;
+  });
+  return Object.keys(bySec).map(l=>({label:l,pct:bySec[l]/tot*100})).sort((a,b)=>b.pct-a.pct);
+}
 function fonPrintSummary(){
   if(!fonData||!fonData.holdings){flash("Önce fon verisini aç");return;}
   const funds=fonData.funds||{};
@@ -1692,27 +1725,43 @@ function fonPrintSummary(){
   const garr=fonReturnGroups();
   let eq=(fonData.holdings||[]).filter(h=>h.kind==="equity");
   if(fonFund!=="ALL")eq=eq.filter(h=>h.funds&&h.funds[fonFund]);
-  eq=eq.map(h=>({h,w:fonWeight(h)})).sort((a,b)=>b.w-a.w).slice(0,15);
+  eq=eq.map(h=>({h,w:fonWeight(h)})).sort((a,b)=>b.w-a.w).slice(0,10);
   let dt="";try{dt=new Date().toLocaleDateString("tr-TR");}catch(e){}
   const rcell=v=>v==null?"—":`<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${(Math.abs(v)>=10?Math.round(v):v.toFixed(1))}%</span>`;
+  const modeLbl=FON_RET_LBL[fonRetMode];
+  const retHdr={cost:"Alış Getirisi","1w":"1 Hafta","1m":"1 Ay","3m":"3 Ay"}[fonRetMode];
+  const totC=garr.reduce((s,g)=>s+(g.contrib||0),0);
+  // dağılım donut'u (seçili kapsam)
+  const alloc=fonAllocCombined(keys);let ci=0;
+  alloc.forEach(a=>{a.color=(a.label==="Takipsiz hisse"||a.label==="Nakit / Diğer")?FON_GREY:FON_COLORS[ci++%FON_COLORS.length];});
+  const donut=donutSvg(alloc.map(a=>({label:a.label,pct:a.pct,color:a.color})),160);
+  const legend=alloc.map(a=>`<div class="fpl-i"><span class="fpl-sw" style="background:${a.color}"></span><span class="fpl-t">${esc(a.label)}</span><b>%${a.pct.toFixed(1)}</b></div>`).join("");
+  // getiri bar chart'ı
+  const maxAbs=Math.max(1,...garr.map(g=>Math.abs(g.avg||0)));
+  const bars=garr.map(g=>{const v=g.avg,has=v!=null,pos=has&&v>=0,bh=has?Math.round(Math.abs(v)/maxAbs*52):0;
+    return `<div class="fpb-col"><div class="fpb-plot"><div class="fpb-bar ${pos?"up":"down"}" style="height:${bh}px;${pos?"bottom":"top"}:56px"></div></div>`+
+      `<div class="fpb-val ${has?(pos?"up":"down"):""}">${has?((pos?"+":"")+v.toFixed(0)+"%"):"—"}</div>`+
+      `<div class="fpb-name">${esc(shortSec(g.sec))}<br>%${g.w.toFixed(0)}</div></div>`;}).join("");
+
   let html=`<div class="fp-head"><h1>💼 ${esc(title)} — Fon Özeti</h1>
-    <div class="fp-meta">Portföy tarihi: ${esc(fonData.asOf||"")} · Rapor tarihi: ${esc(dt)}</div></div>`;
+    <div class="fp-meta">Portföy tarihi: ${esc(fonData.asOf||"")} · Rapor: ${esc(dt)} · Getiri penceresi: ${esc(modeLbl)}</div></div>`;
   html+=`<div class="fp-kpis">
     <div><span>Büyüklük</span><b>${fmtTL(total)}</b></div>
     <div><span>Hisse Oranı</span><b>%${eqPct}</b></div>
-    <div><span>Fon(lar)</span><b>${esc(keys.join(", "))}</b></div></div>`;
-  const modeLbl=FON_RET_LBL[fonRetMode];
-  const retHdr={cost:"Alış Getirisi","1w":"1 Hafta Getiri","1m":"1 Ay Getiri","3m":"3 Ay Getiri"}[fonRetMode];
-  const totC=garr.reduce((s,g)=>s+(g.contrib||0),0);
-  html+=`<h2>Sektör Bazında Getiri (${modeLbl}) — portföye katkı toplamı ${totC>=0?"+":""}${totC.toFixed(2)} puan</h2>
-    <table class="fp-tbl"><thead><tr><th>Sektör</th><th class="r">Ağırlık</th><th class="r">Ort. Getiri</th><th class="r">Katkı (puan)</th><th>Hisseler</th></tr></thead><tbody>`+
-    garr.map(g=>`<tr><td>${esc(g.sec)}</td><td class="r">%${g.w.toFixed(1)}</td><td class="r">${rcell(g.avg)}</td><td class="r"><span class="${(g.contrib||0)>=0?"up":"down"}">${(g.contrib||0)>=0?"+":""}${(g.contrib||0).toFixed(2)}</span></td><td class="tks">${g.items.map(h=>esc(h.ticker)).join(", ")}</td></tr>`).join("")+
+    <div><span>Portföye Katkı</span><b class="${totC>=0?"up":"down"}">${totC>=0?"+":""}${totC.toFixed(2)} puan</b></div></div>`;
+  html+=`<div class="fp-cols">
+    <div class="fp-col fp-col-donut"><h3>Sektör Dağılımı</h3><div class="fp-donutwrap"><div class="fp-ring">${donut}</div><div class="fp-legend">${legend}</div></div></div>
+    <div class="fp-col fp-col-bars"><h3>Sektör Bazında Getiri (${esc(retHdr)})</h3><div class="fp-bars">${bars}</div></div>
+  </div>`;
+  html+=`<h2>Sektör Detayı</h2>
+    <table class="fp-tbl"><thead><tr><th>Sektör</th><th class="r">Ağırlık</th><th class="r">${esc(retHdr)}</th><th class="r">Katkı (p)</th></tr></thead><tbody>`+
+    garr.map(g=>`<tr><td>${esc(g.sec)}</td><td class="r">%${g.w.toFixed(1)}</td><td class="r">${rcell(g.avg)}</td><td class="r"><span class="${(g.contrib||0)>=0?"up":"down"}">${(g.contrib||0)>=0?"+":""}${(g.contrib||0).toFixed(2)}</span></td></tr>`).join("")+
     `</tbody></table>`;
-  html+=`<h2>En Büyük 15 Pozisyon</h2>
-    <table class="fp-tbl"><thead><tr><th>Ticker</th><th>Sektör</th><th class="r">Ağırlık</th><th class="r">${retHdr}</th></tr></thead><tbody>`+
+  html+=`<h2>En Büyük 10 Pozisyon</h2>
+    <table class="fp-tbl"><thead><tr><th>Ticker</th><th>Sektör</th><th class="r">Ağırlık</th><th class="r">${esc(retHdr)}</th></tr></thead><tbody>`+
     eq.map(({h,w})=>`<tr><td><b>${esc(h.ticker)}</b></td><td>${esc(h.sector||"—")}</td><td class="r">%${w.toFixed(2)}</td><td class="r">${rcell(fonHoldRet(h))}</td></tr>`).join("")+
     `</tbody></table>`;
-  html+=`<div class="fp-foot">Kaynak: fon_database.xlsx (${esc(fonData.asOf||"")}) · Getiriler Yahoo Finance günlük kapanışına göre yaklaşık ~3 aylık. Bu belge bilgilendirme amaçlıdır, yatırım tavsiyesi değildir.</div>`;
+  html+=`<div class="fp-foot">Kaynak: fon_database.xlsx (${esc(fonData.asOf||"")}) · Getiriler Yahoo Finance günlük kapanışı. Katkı = ağırlık × getiri. Bilgilendirme amaçlıdır, yatırım tavsiyesi değildir.</div>`;
   document.getElementById("fonPrint").innerHTML=html;
   window.print();
 }
