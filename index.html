@@ -287,6 +287,29 @@
   .rot-meta{flex:0 0 74px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--faint)}
   .rot-empty,.rot-nodata{font-family:var(--mono);font-size:11px;color:var(--faint);padding:4px 0 10px}
   @media(max-width:760px){.rot-name{flex-basis:110px}.rot-meta,.rot-exc{display:none}}
+  /* rotasyon: görünüm anahtarı (Liste | Kadran | Zaman) */
+  .rot-view{display:inline-flex;gap:3px;background:var(--ground);border:1px solid var(--line-cool);border-radius:7px;padding:3px}
+  .rotview{background:none;border:none;color:var(--muted);border-radius:5px;padding:3px 11px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:.14s}
+  .rotview:hover{color:var(--text)}
+  .rotview.on{background:rgba(233,165,60,.14);color:var(--accent)}
+  /* RRG kadranı */
+  .rrg-wrap{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;padding:8px 0 16px}
+  .rrg-canvas{flex:0 0 auto;width:100%;max-width:560px;height:auto;aspect-ratio:1/1;
+    background:rgba(0,0,0,.18);border:1px solid var(--line-cool);border-radius:12px}
+  :root[data-theme="light"] .rrg-canvas,:root[data-theme="light"] .bump-canvas{background:rgba(87,79,58,.05)}
+  .rrg-side{flex:1;min-width:210px;display:flex;flex-direction:column;gap:11px}
+  .rrg-quadkey{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .rrg-qk{font-family:var(--mono);font-size:10.5px;padding:5px 8px;border-radius:6px;border:1px solid;line-height:1.25}
+  .rrg-legend{display:flex;flex-direction:column;gap:5px}
+  .rrg-li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .rrg-li .rl-num{font-family:var(--mono);font-size:10px;color:var(--faint);width:16px;flex:none}
+  .rrg-li .rl-sw{width:10px;height:10px;border-radius:3px;flex:none}
+  .rrg-li .rrg-q{font-family:var(--mono);font-size:9.5px;margin-left:auto;padding:0 6px;border-radius:4px;border:1px solid;white-space:nowrap}
+  .rrg-note{font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:1.55}
+  .rrg-empty,.bump-empty{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding:16px 0 18px;line-height:1.6}
+  /* zaman çizgisi (bump) */
+  .bump-wrap{padding:4px 0 14px;overflow-x:auto}
+  .bump-canvas{width:100%;min-width:560px;height:auto;border:1px solid var(--line-cool);border-radius:12px;background:rgba(0,0,0,.18)}
   /* chart modal */
   .modal[hidden]{display:none}
   .modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center}
@@ -1179,6 +1202,9 @@ let rotationOpen=localStorage.getItem("sm-rotopen")!=="0";
 let rotBase=localStorage.getItem("sm-rotbase")||"mutlak";   // kıyas: mutlak | evren | SPY | QQQ | IWM
 const ROT_WINDOWS=[["1H",5],["1A",21]]; // işlem günü: ~1 hafta / ~1 ay
 const BENCHES=["SPY","QQQ","IWM"];
+let rotView=localStorage.getItem("sm-rotview")||"list";      // list | rrg | bump
+let rrgBench=localStorage.getItem("sm-rrgbench")||"SPY";     // RRG kadranı benchmark'ı
+let bumpMetric=localStorage.getItem("sm-bumpmetric")||"rank";// zaman çizgisi ölçütü: rank | ret
 function winReturn(closes,n){
   if(!closes||closes.length<n+1)return null;
   const last=closes[closes.length-1],prev=closes[closes.length-1-n];
@@ -1263,61 +1289,251 @@ function sectorRotation(days){
   valid.forEach(r=>{r.rel=r.ret-baseline;});            // bar bu değere göre (Mutlak'ta = mutlak getiri)
   return {rows,uni,baseline,benchRet,baseMissing};
 }
+/* ===== RRG (Rotasyon Kadranı) — güç × momentum ===== */
+// Sektörün benchmark'a göre GÖRELİ GÜCÜ (RS-Ratio, x) ve o gücün MOMENTUMU
+// (RS-Momentum, y) üzerinden 4 bölge: Öncüler / Zayıflıyor / Geride / İyileşiyor.
+// Tümü tarayıcıda, mevcut fiyat geçmişinden (hist.c) hesaplanır — backend gerekmez.
+const RRG_W=50, RRG_K=10, RRG_TAIL=8, RRG_STEP=5, RRG_MINSPAN=115; // işlem günü pencereleri
+const RRG_QCOL=["#7FB069","#E9A53C","#D2654E","#6FA2CE"];          // Öncü·Zayıf·Geride·İyileş
+const RRG_QNAME=["Öncüler","Zayıflıyor","Geride","İyileşiyor"];
+function quadOf(x,y){return x>=100?(y>=100?0:1):(y>=100?3:2);}
+// Boşluklu (null'lu) diziyi es geçen kayan z-skoru
+function rollZnull(arr,w){
+  const out=arr.map(()=>null);
+  for(let i=w-1;i<arr.length;i++){
+    let ok=true,m=0;
+    for(let j=i-w+1;j<=i;j++){if(arr[j]==null){ok=false;break;}m+=arr[j];}
+    if(!ok)continue;
+    m/=w;let v=0;for(let j=i-w+1;j<=i;j++){const d=arr[j]-m;v+=d*d;}v/=w;
+    const sd=Math.sqrt(v);out[i]=sd?(arr[i]-m)/sd:0;
+  }
+  return out;
+}
+// Eşit ağırlıklı sektör fiyat endeksi (100'e sabitli), sona hizalı; farklı geçmiş
+// uzunluğundaki üyeleri o gün mevcutsa hesaba katar.
+function eqWeightIndex(closesList,L){
+  let maxAgo=0;closesList.forEach(a=>{if(a.length-1>maxAgo)maxAgo=a.length-1;});
+  const span=Math.min(L,maxAgo+1);if(span<2)return null;
+  const idx=new Array(span);idx[0]=100;
+  for(let p=1;p<span;p++){
+    const agoNew=span-1-p,agoOld=agoNew+1;let sum=0,cnt=0;
+    for(const a of closesList){const iN=a.length-1-agoNew,iO=a.length-1-agoOld;
+      if(iO>=0&&iN>=0){const cN=a[iN],cO=a[iO];if(cO){sum+=(cN/cO-1);cnt++;}}}
+    idx[p]=idx[p-1]*(1+(cnt?sum/cnt:0));
+  }
+  return idx;
+}
+function rrgSeries(){
+  const bq=quoteOf(rrgBench);
+  const bench=(bq&&bq.hist&&bq.hist.c&&bq.hist.c.length>1)?bq.hist.c:null;
+  if(!bench)return {series:[],skipped:[],noBench:true};
+  const series=[],skipped=[];
+  state.sectors.forEach((sec,i)=>{
+    const members=sec.companies.map(c=>histOf(c.ticker)).filter(h=>h&&h.c&&h.c.length>1).map(h=>h.c);
+    if(!members.length){skipped.push(sec.name);return;}
+    const idx=eqWeightIndex(members,252);
+    if(!idx||idx.length<RRG_MINSPAN){skipped.push(sec.name);return;}
+    const span=idx.length;
+    const bslice=bench.slice(-span);if(bslice.length<span){skipped.push(sec.name);return;}
+    const b0=bslice[0];if(!b0){skipped.push(sec.name);return;}
+    const bidx=bslice.map(v=>v/b0*100);
+    const RS=idx.map((v,j)=>bidx[j]?100*v/bidx[j]:100);                    // göreli güç çizgisi
+    const RSR=rollZnull(RS,RRG_W).map(z=>z==null?null:100+z);             // RS-Ratio (100 merkez)
+    const mom=RSR.map((v,j)=>(j>=RRG_K&&v!=null&&RSR[j-RRG_K]!=null)?v-RSR[j-RRG_K]:null);
+    const RSM=rollZnull(mom,RRG_W).map(z=>z==null?null:100+z);            // RS-Momentum
+    const pts=[];
+    for(let p=RRG_TAIL-1;p>=0;p--){const j=span-1-p*RRG_STEP;if(j>=0&&RSR[j]!=null&&RSM[j]!=null)pts.push({x:RSR[j],y:RSM[j]});}
+    if(!pts.length){skipped.push(sec.name);return;}
+    series.push({num:String(i+1).padStart(2,"0"),name:sec.name,color:FON_COLORS[i%FON_COLORS.length],points:pts});
+  });
+  return {series,skipped};
+}
+function drawRRG(cv,series){
+  const ctx=cv.getContext("2d"),W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
+  const light=isLight(),faint=light?"#a99b78":"#6b7480";
+  let half=2.5;
+  series.forEach(s=>s.points.forEach(p=>{half=Math.max(half,Math.abs(p.x-100),Math.abs(p.y-100));}));
+  half=Math.min(half*1.15,8);
+  const padL=40,padR=16,padT=16,padB=28,lo=100-half,sp=2*half;
+  const X=x=>padL+((x-lo)/sp)*(W-padL-padR);
+  const Y=y=>padT+(1-(y-lo)/sp)*(H-padT-padB);
+  const x0=X(100),y0=Y(100),xL=X(lo),xR=X(100+half),yT=Y(100+half),yB=Y(lo);
+  const qf=light?.11:.07;
+  ctx.fillStyle=hexA(RRG_QCOL[0],qf);ctx.fillRect(x0,yT,xR-x0,y0-yT);   // Öncü (TR)
+  ctx.fillStyle=hexA(RRG_QCOL[1],qf);ctx.fillRect(x0,y0,xR-x0,yB-y0);    // Zayıf (BR)
+  ctx.fillStyle=hexA(RRG_QCOL[2],qf);ctx.fillRect(xL,y0,x0-xL,yB-y0);    // Geride (BL)
+  ctx.fillStyle=hexA(RRG_QCOL[3],qf);ctx.fillRect(xL,yT,x0-xL,y0-yT);   // İyileş (TL)
+  ctx.strokeStyle=gridCol(true);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x0,yT);ctx.lineTo(x0,yB);ctx.moveTo(xL,y0);ctx.lineTo(xR,y0);ctx.stroke();
+  ctx.font="700 11px ui-monospace,Consolas,monospace";
+  ctx.textBaseline="top";
+  ctx.textAlign="right";ctx.fillStyle=hexA(RRG_QCOL[0],.92);ctx.fillText("ÖNCÜLER",xR-4,yT+3);
+  ctx.textAlign="left"; ctx.fillStyle=hexA(RRG_QCOL[3],.92);ctx.fillText("İYİLEŞİYOR",xL+4,yT+3);
+  ctx.textBaseline="bottom";
+  ctx.textAlign="right";ctx.fillStyle=hexA(RRG_QCOL[1],.92);ctx.fillText("ZAYIFLIYOR",xR-4,yB-3);
+  ctx.textAlign="left"; ctx.fillStyle=hexA(RRG_QCOL[2],.92);ctx.fillText("GERİDE",xL+4,yB-3);
+  ctx.font="9px ui-monospace,Consolas,monospace";ctx.fillStyle=faint;
+  ctx.textAlign="center";ctx.textBaseline="bottom";ctx.fillText("Göreli Güç →",(xL+xR)/2,H-2);
+  ctx.save();ctx.translate(11,(yT+yB)/2);ctx.rotate(-Math.PI/2);ctx.textAlign="center";ctx.textBaseline="top";ctx.fillText("Göreli Momentum →",0,0);ctx.restore();
+  series.forEach(s=>{
+    const pts=s.points;
+    if(pts.length>1){
+      ctx.strokeStyle=hexA(s.color,.55);ctx.lineWidth=1.6;ctx.lineJoin="round";
+      ctx.beginPath();pts.forEach((p,j)=>{const x=X(p.x),y=Y(p.y);j?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+      ctx.fillStyle=hexA(s.color,.55);
+      for(let j=0;j<pts.length-1;j++){ctx.beginPath();ctx.arc(X(pts[j].x),Y(pts[j].y),1.7,0,Math.PI*2);ctx.fill();}
+    }
+    const hd=pts[pts.length-1],hx=X(hd.x),hy=Y(hd.y);
+    ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(hx,hy,6,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=light?"rgba(255,255,255,.85)":"rgba(14,19,24,.9)";ctx.lineWidth=1.4;ctx.stroke();
+    ctx.fillStyle="#fff";ctx.font="700 8.5px ui-monospace,Consolas,monospace";
+    ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(s.num,hx,hy);
+  });
+}
+/* ===== Zaman çizgisi (bump chart) — snapshot'lardan sıra/getiri hareketi ===== */
+function bumpSeries(){
+  if(!taramaData||!taramaData.snapshots||!taramaData.snapshots.length)return null;
+  const snaps=taramaData.snapshots;
+  const latest=snaps[snaps.length-1].sectors||{};
+  const idxOf={};state.sectors.forEach((s,i)=>{idxOf[s.name]=i;});
+  const names=Object.keys(latest);
+  const series=names.map((nm,ni)=>{
+    const i=(idxOf[nm]!=null)?idxOf[nm]:ni;
+    const pts=snaps.map((sn,si)=>{const r=(sn.sectors||{})[nm];return (r&&r.rank!=null)?{si,rank:r.rank,ret:r.ret1w}:null;}).filter(Boolean);
+    return {name:nm,num:String(i+1).padStart(2,"0"),color:FON_COLORS[i%FON_COLORS.length],pts,last:(latest[nm]||{}).rank||99};
+  }).filter(s=>s.pts.length);
+  return {series,dates:snaps.map(s=>s.date),n:snaps.length};
+}
+function drawBump(cv,data,metric){
+  const ctx=cv.getContext("2d"),W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
+  const light=isLight(),txt=light?"#8a7d5e":"#8B93A0",faint=light?"#a99b78":"#6b7480";
+  const {series,dates,n}=data;
+  const padL=34,padR=176,padT=14,padB=26;
+  const X=si=>n<=1?padL:(padL+(si/(n-1))*(W-padL-padR));
+  let Y,ymin,ymax;
+  if(metric==="rank"){
+    let mx=1;series.forEach(s=>s.pts.forEach(p=>{if(p.rank>mx)mx=p.rank;}));
+    ymin=1;ymax=mx;Y=r=>padT+((r-1)/((mx-1)||1))*(H-padT-padB);
+  }else{
+    let lo=1e9,hi=-1e9;series.forEach(s=>s.pts.forEach(p=>{if(p.ret<lo)lo=p.ret;if(p.ret>hi)hi=p.ret;}));
+    if(lo>0)lo=0;if(hi<0)hi=0;const pd=(hi-lo)*0.08||1;lo-=pd;hi+=pd;
+    ymin=lo;ymax=hi;Y=v=>padT+(1-(v-lo)/((hi-lo)||1))*(H-padT-padB);
+  }
+  ctx.font="9px ui-monospace,Consolas,monospace";ctx.textBaseline="middle";ctx.textAlign="right";
+  if(metric==="rank"){
+    for(let r=1;r<=ymax;r++){const y=Y(r);ctx.strokeStyle=gridCol(false);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();ctx.fillStyle=faint;ctx.fillText("#"+r,padL-4,y);}
+  }else{
+    for(let k=0;k<=4;k++){const v=ymin+(ymax-ymin)*k/4,y=Y(v);ctx.strokeStyle=gridCol(Math.abs(v)<0.01);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();ctx.fillStyle=faint;ctx.fillText((v>=0?"+":"")+v.toFixed(0)+"%",padL-4,y);}
+  }
+  ctx.fillStyle=faint;ctx.textBaseline="alphabetic";
+  const di=n<=1?[0]:[0,Math.floor((n-1)/2),n-1],al=["left","center","right"];
+  di.forEach((si,j)=>{const d=dates[si]||"";ctx.textAlign=al[Math.min(j,2)];ctx.fillText(d.slice(5,7)+"/"+d.slice(8,10),Math.min(Math.max(X(si),padL),W-padR),H-6);});
+  series.forEach(s=>{
+    const val=p=>metric==="rank"?p.rank:p.ret;
+    ctx.strokeStyle=s.color;ctx.lineWidth=2;ctx.lineJoin="round";
+    ctx.beginPath();s.pts.forEach((p,j)=>{const x=X(p.si),y=Y(val(p));j?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+    ctx.fillStyle=s.color;s.pts.forEach(p=>{ctx.beginPath();ctx.arc(X(p.si),Y(val(p)),2.4,0,Math.PI*2);ctx.fill();});
+    const last=s.pts[s.pts.length-1],lx=X(last.si)+8,ly=Y(val(last));
+    ctx.fillStyle=s.color;ctx.font="700 10px 'Segoe UI',sans-serif";ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.fillText(s.num+" "+shortSec(s.name),lx,ly);
+  });
+}
 function renderRotation(){
   const el=document.getElementById("rotation");if(!el)return;
   if(!priceData||!priceData.quotes){el.innerHTML="";return;}             // fiyat verisi yoksa gizle
-  const days=(ROT_WINDOWS.find(w=>w[0]===rotationWin)||ROT_WINDOWS[1])[1];
-  const R=sectorRotation(days);
-  const valid=R.rows.filter(r=>r.ret!=null).sort((a,b)=>b.ret-a.ret);    // lider üstte
-  const br=benchReturns(days);
-  const BASES=[["mutlak","Mutlak"],["evren","Evren"],["SPY","SPY"],["QQQ","QQQ"],["IWM","IWM"]];
-  const baseBtns=BASES.map(b=>`<button class="rotwin ${rotBase===b[0]?'on':''}" data-rb="${b[0]}" title="${b[0]==='mutlak'?'Kıyas yok — mutlak getiriye göre yeşil/kırmızı':(b[0]==='evren'?'Kendi takip evreninin ortalamasına göre':b[0]+' endeksine göre')}">${b[1]}</button>`).join("");
-  const isCmp=rotBase!=="mutlak";
-  const refTxt=BENCHES.filter(b=>br[b]!=null).map(b=>`${b} <b class="${br[b]>=0?'up':'down'}">${br[b]>=0?'+':''}${br[b].toFixed(1)}%</b>`).join(" · ")||"benchmark verisi yok";
-  const head=`<div class="rot-head">
-    <span class="rot-title">Sektör Rotasyonu</span>
-    <span class="rot-win">${ROT_WINDOWS.map(w=>`<button class="rotwin ${rotationWin===w[0]?'on':''}" data-rw="${w[0]}">${w[0]==="1H"?"1 Hafta":"1 Ay"}</button>`).join("")}</span>
-    <span class="rot-klabel">Kıyas</span><span class="rot-win">${baseBtns}</span>
-    <span class="rot-ref">${refTxt}</span>
-    <span class="rot-spacer"></span>
-    <button class="rot-toggle">${rotationOpen?"gizle ▾":"göster ▸"}</button>
-  </div>`;
-  let bodyHtml="";
-  if(rotationOpen){
-    if(!valid.length){
-      bodyHtml=`<div class="rot-empty">Rotasyon için hisse geçmişi yok — sektörlere hisse ekleyip fiyatları güncelle.</div>`;
-    }else{
-      const baseName=rotBase==="evren"?"evren ort.":rotBase;
-      const colhead=`<div class="rot-row rot-colhead">
-        <span class="rot-name">Sektör</span><div class="rot-track"></div>
-        <span class="rot-ret">${rotationWin==="1H"?"1H":"1A"} getiri</span>
-        ${isCmp?`<span class="rot-exc">vs ${esc(baseName)}</span>`:""}
-        <span class="rot-meta">hisse</span>
-      </div>`;
-      const maxAbs=Math.max(0.01,...valid.map(r=>Math.abs(r.rel)));   // bar seçili kıyasa göre ölçeklenir
-      const rowsHtml=valid.map(r=>{
-        const bv=r.rel,pos=bv>=0,w=Math.abs(bv)/maxAbs*50;            // Mutlak'ta bv=mutlak getiri, kıyasta=fark
-        const bar=pos?`left:50%;width:${w}%`:`left:${50-w}%;width:${w}%`;
-        const rpos=r.ret>=0;
-        const exc=isCmp?(R.baseMissing?`<span class="rot-exc dim">—</span>`:`<span class="rot-exc ${pos?'up':'down'}">${pos?'+':''}${r.rel.toFixed(1)}</span>`):"";
-        return `<div class="rot-row">
-          <span class="rot-name" title="${esc(r.sec.name)}">${esc(r.sec.name)}</span>
-          <div class="rot-track"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${bar}"></div></div>
-          <span class="rot-ret ${rpos?"up":"down"}">${rpos?"+":""}${r.ret.toFixed(1)}%</span>
-          ${exc}
-          <span class="rot-meta" title="kaç hisse · artıda olan %">${r.n}h·${r.breadth}%↑</span>
+  const views=[["list","Liste"],["rrg","Kadran"],["bump","Zaman"]];
+  const viewToggle=`<span class="rot-view">${views.map(v=>`<button class="rotview ${rotView===v[0]?'on':''}" data-rv="${v[0]}" title="${v[0]==='list'?'Sıralı getiri listesi':(v[0]==='rrg'?'Rotasyon kadranı — göreli güç × momentum':'Sıralamanın zaman içindeki hareketi')}">${v[1]}</button>`).join("")}</span>`;
+  let ctrls="",body="";
+  if(rotView==="list"){
+    const days=(ROT_WINDOWS.find(w=>w[0]===rotationWin)||ROT_WINDOWS[1])[1];
+    const R=sectorRotation(days);
+    const valid=R.rows.filter(r=>r.ret!=null).sort((a,b)=>b.ret-a.ret);  // lider üstte
+    const br=benchReturns(days);
+    const BASES=[["mutlak","Mutlak"],["evren","Evren"],["SPY","SPY"],["QQQ","QQQ"],["IWM","IWM"]];
+    const baseBtns=BASES.map(b=>`<button class="rotwin ${rotBase===b[0]?'on':''}" data-rb="${b[0]}" title="${b[0]==='mutlak'?'Kıyas yok — mutlak getiriye göre yeşil/kırmızı':(b[0]==='evren'?'Kendi takip evreninin ortalamasına göre':b[0]+' endeksine göre')}">${b[1]}</button>`).join("");
+    const isCmp=rotBase!=="mutlak";
+    const refTxt=BENCHES.filter(b=>br[b]!=null).map(b=>`${b} <b class="${br[b]>=0?'up':'down'}">${br[b]>=0?'+':''}${br[b].toFixed(1)}%</b>`).join(" · ")||"benchmark verisi yok";
+    ctrls=`<span class="rot-win">${ROT_WINDOWS.map(w=>`<button class="rotwin ${rotationWin===w[0]?'on':''}" data-rw="${w[0]}">${w[0]==="1H"?"1 Hafta":"1 Ay"}</button>`).join("")}</span>
+      <span class="rot-klabel">Kıyas</span><span class="rot-win">${baseBtns}</span><span class="rot-ref">${refTxt}</span>`;
+    if(rotationOpen){
+      if(!valid.length){
+        body=`<div class="rot-empty">Rotasyon için hisse geçmişi yok — sektörlere hisse ekleyip fiyatları güncelle.</div>`;
+      }else{
+        const baseName=rotBase==="evren"?"evren ort.":rotBase;
+        const colhead=`<div class="rot-row rot-colhead">
+          <span class="rot-name">Sektör</span><div class="rot-track"></div>
+          <span class="rot-ret">${rotationWin==="1H"?"1H":"1A"} getiri</span>
+          ${isCmp?`<span class="rot-exc">vs ${esc(baseName)}</span>`:""}
+          <span class="rot-meta">hisse</span>
         </div>`;
-      }).join("");
-      const miss=R.baseMissing?`<div class="rot-nodata">${esc(rotBase)} verisi henüz yok — şimdilik evren ortalamasına göre gösteriliyor.</div>`:"";
-      const noData=R.rows.filter(r=>r.ret==null);
-      const nd=noData.length?`<div class="rot-nodata">Veri yetersiz: ${noData.map(r=>esc(r.sec.name)).join(" · ")}</div>`:"";
-      bodyHtml=colhead+`<div class="rot-list">`+rowsHtml+`</div>`+miss+nd;
+        const maxAbs=Math.max(0.01,...valid.map(r=>Math.abs(r.rel)));
+        const rowsHtml=valid.map(r=>{
+          const bv=r.rel,pos=bv>=0,w=Math.abs(bv)/maxAbs*50;
+          const bar=pos?`left:50%;width:${w}%`:`left:${50-w}%;width:${w}%`;
+          const rpos=r.ret>=0;
+          const exc=isCmp?(R.baseMissing?`<span class="rot-exc dim">—</span>`:`<span class="rot-exc ${pos?'up':'down'}">${pos?'+':''}${r.rel.toFixed(1)}</span>`):"";
+          return `<div class="rot-row">
+            <span class="rot-name" title="${esc(r.sec.name)}">${esc(r.sec.name)}</span>
+            <div class="rot-track"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${bar}"></div></div>
+            <span class="rot-ret ${rpos?"up":"down"}">${rpos?"+":""}${r.ret.toFixed(1)}%</span>
+            ${exc}
+            <span class="rot-meta" title="kaç hisse · artıda olan %">${r.n}h·${r.breadth}%↑</span>
+          </div>`;
+        }).join("");
+        const miss=R.baseMissing?`<div class="rot-nodata">${esc(rotBase)} verisi henüz yok — şimdilik evren ortalamasına göre gösteriliyor.</div>`:"";
+        const noData=R.rows.filter(r=>r.ret==null);
+        const nd=noData.length?`<div class="rot-nodata">Veri yetersiz: ${noData.map(r=>esc(r.sec.name)).join(" · ")}</div>`:"";
+        body=colhead+`<div class="rot-list">`+rowsHtml+`</div>`+miss+nd;
+      }
+    }
+  }else if(rotView==="rrg"){
+    ctrls=`<span class="rot-klabel">Benchmark</span><span class="rot-win">${BENCHES.map(b=>`<button class="rotwin ${rrgBench===b?'on':''}" data-rrgb="${b}">${b}</button>`).join("")}</span>
+      <span class="rot-ref">güç × momentum · kuyruk ~${RRG_TAIL} hafta</span>`;
+    if(rotationOpen){
+      const R=rrgSeries();
+      if(R.noBench){body=`<div class="rrg-empty">${esc(rrgBench)} benchmark fiyat verisi yok — verileri güncelle.</div>`;}
+      else if(!R.series.length){body=`<div class="rrg-empty">Kadran için yeterli fiyat geçmişi yok. Her sektörde ~6 ay+ geçmişi olan hisseler gerekir.</div>`;}
+      else{
+        const qk=RRG_QNAME.map((nm,qi)=>`<div class="rrg-qk" style="border-color:${hexA(RRG_QCOL[qi],.5)};color:${RRG_QCOL[qi]}">${nm}</div>`).join("");
+        const leg=R.series.map(s=>{const hd=s.points[s.points.length-1],qi=quadOf(hd.x,hd.y);
+          return `<div class="rrg-li"><span class="rl-num">${s.num}</span><span class="rl-sw" style="background:${s.color}"></span><span>${esc(shortSec(s.name))}</span><span class="rrg-q" style="border-color:${hexA(RRG_QCOL[qi],.55)};color:${RRG_QCOL[qi]}">${RRG_QNAME[qi]}</span></div>`;}).join("");
+        const skip=R.skipped.length?`<div class="rrg-note">Yetersiz geçmiş (kadranda yok): ${R.skipped.map(esc).join(" · ")}</div>`:"";
+        body=`<div class="rrg-wrap"><canvas class="rrg-canvas" id="rrgCanvas" width="600" height="600"></canvas>
+          <div class="rrg-side"><div class="rrg-quadkey">${qk}</div><div class="rrg-legend">${leg}</div>${skip}
+          <div class="rrg-note">Sektörler saat yönünde döner: İyileşiyor → Öncüler → Zayıflıyor → Geride. Nokta = bugün, kuyruk son ~${RRG_TAIL} hafta. Benchmark: ${esc(rrgBench)}.</div></div></div>`;
+      }
+    }
+  }else{ // bump
+    ctrls=`<span class="rot-klabel">Ölçüt</span><span class="rot-win">${[["rank","Sıra"],["ret","1H getiri"]].map(m=>`<button class="rotwin ${bumpMetric===m[0]?'on':''}" data-bm="${m[0]}">${m[1]}</button>`).join("")}</span>`;
+    if(rotationOpen){
+      const B=bumpSeries();
+      if(!B){body=`<div class="bump-empty">Zaman çizgisi için tarama verisi gerekiyor. Tarama Çar & Cum otomatik biriktirir${ghReady()?" — yükleniyor…":" (önce GitHub'a bağlan)"}.</div>`;}
+      else if(B.n<2){body=`<div class="bump-empty">Şu an ${B.n} tarama snapshot'ı var — zaman çizgisi için en az 2 gerekir. Bir sonraki tarama (Çar/Cum) sonrası dolmaya başlar.</div>`;}
+      else{
+        body=`<div class="rrg-note" style="margin-bottom:6px">${B.n} tarama · ${esc(B.dates[0])} → ${esc(B.dates[B.dates.length-1])} · ${bumpMetric==='rank'?'üstte = daha güçlü sıra (#1 tepe)':'sektör eşit-ağırlık 1H getirisi'}</div>
+          <div class="bump-wrap"><canvas class="bump-canvas" id="bumpCanvas" width="860" height="380"></canvas></div>`;
+      }
     }
   }
-  el.innerHTML=head+bodyHtml;
-  el.querySelectorAll(".rotwin[data-rw]").forEach(b=>b.onclick=()=>{rotationWin=b.dataset.rw;localStorage.setItem("sm-rotwin",rotationWin);renderRotation();});
-  el.querySelectorAll(".rotwin[data-rb]").forEach(b=>b.onclick=()=>{rotBase=b.dataset.rb;localStorage.setItem("sm-rotbase",rotBase);renderRotation();});
+  const head=`<div class="rot-head"><span class="rot-title">Sektör Rotasyonu</span>${viewToggle}${rotationOpen?ctrls:""}
+    <span class="rot-spacer"></span><button class="rot-toggle">${rotationOpen?"gizle ▾":"göster ▸"}</button></div>`;
+  el.innerHTML=head+body;
+  el.querySelectorAll(".rotview[data-rv]").forEach(b=>b.onclick=()=>{
+    rotView=b.dataset.rv;localStorage.setItem("sm-rotview",rotView);
+    if(rotView==="bump"&&!taramaData&&ghReady())ghLoadTarama().then(()=>renderRotation()).catch(()=>{});
+    renderRotation();
+  });
   const tg=el.querySelector(".rot-toggle");if(tg)tg.onclick=()=>{rotationOpen=!rotationOpen;localStorage.setItem("sm-rotopen",rotationOpen?"1":"0");renderRotation();};
+  if(rotView==="list"){
+    el.querySelectorAll(".rotwin[data-rw]").forEach(b=>b.onclick=()=>{rotationWin=b.dataset.rw;localStorage.setItem("sm-rotwin",rotationWin);renderRotation();});
+    el.querySelectorAll(".rotwin[data-rb]").forEach(b=>b.onclick=()=>{rotBase=b.dataset.rb;localStorage.setItem("sm-rotbase",rotBase);renderRotation();});
+  }else if(rotView==="rrg"){
+    el.querySelectorAll(".rotwin[data-rrgb]").forEach(b=>b.onclick=()=>{rrgBench=b.dataset.rrgb;localStorage.setItem("sm-rrgbench",rrgBench);renderRotation();});
+    const cv=document.getElementById("rrgCanvas");if(cv){const R=rrgSeries();if(R.series&&R.series.length)drawRRG(cv,R.series);}
+  }else{
+    el.querySelectorAll(".rotwin[data-bm]").forEach(b=>b.onclick=()=>{bumpMetric=b.dataset.bm;localStorage.setItem("sm-bumpmetric",bumpMetric);renderRotation();});
+    const cv=document.getElementById("bumpCanvas");if(cv){const B=bumpSeries();if(B&&B.n>=2)drawBump(cv,B,bumpMetric);}
+  }
 }
 
 const REGIME_NAMES_TR=["Risk-On","Nötr","Risk-Off"];
