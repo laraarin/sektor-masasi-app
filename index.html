@@ -310,6 +310,9 @@
   /* zaman çizgisi (bump) */
   .bump-wrap{padding:4px 0 14px;overflow-x:auto}
   .bump-canvas{width:100%;min-width:560px;height:auto;border:1px solid var(--line-cool);border-radius:12px;background:rgba(0,0,0,.18)}
+  /* momentum ısı-şeridi (heatmap) */
+  .heat-wrap{padding:4px 0 14px;overflow-x:auto}
+  .heat-canvas{width:100%;min-width:720px;height:auto;border:1px solid var(--line-cool);border-radius:12px;background:rgba(0,0,0,.18)}
   /* chart modal */
   .modal[hidden]{display:none}
   .modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center}
@@ -1438,12 +1441,83 @@ function drawBump(cv,data,metric){
     ctx.fillText(s.num+" "+shortSec(s.name),lx,ly);
   });
 }
+/* ===== Isı-şeridi (heatmap): sektörlerin momentum sırası zaman içinde ===== */
+// Her gün, her sektörün trailing 3-aylık (63g) momentumu → o günkü sektörler-ARASI
+// sıraya (percentile) çevrilir; koyu yeşil = o günün en güçlüsü, kırmızı = en zayıfı.
+// Satırlar ortalama sıraya göre dizilir. Tamamen tarayıcıda, mevcut fiyat geçmişinden.
+const HEAT_MOM=63, HEAT_L=126;
+const MONTHS_TR=["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+function refDates(){
+  for(const t of ["SPY","QQQ","IWM"]){const q=quoteOf(t);if(q&&q.hist&&q.hist.d&&q.hist.d.length)return q.hist.d;}
+  let best=null;state.sectors.forEach(s=>s.companies.forEach(c=>{const h=histOf(c.ticker);if(h&&h.d&&(!best||h.d.length>best.length))best=h.d;}));
+  return best;
+}
+function heatVal(arr,EXT,g){const off=EXT-arr.length,i=g-off;return (i>=0&&i<arr.length)?arr[i]:null;}
+function heatMom(arr,EXT,g){const a=heatVal(arr,EXT,g-HEAT_MOM),b=heatVal(arr,EXT,g);return (a&&b)?(b/a-1)*100:null;}
+const HEAT_STOPS=[[0,[192,57,43]],[.25,[210,101,78]],[.5,[232,163,61]],[.72,[159,184,122]],[1,[46,139,87]]];
+function heatColor(v){
+  if(v==null)return isLight()?"#e6ddc4":"#121820";
+  for(let k=1;k<HEAT_STOPS.length;k++){if(v<=HEAT_STOPS[k][0]){const a=HEAT_STOPS[k-1],b=HEAT_STOPS[k],t=(v-a[0])/((b[0]-a[0])||1);const c=a[1].map((ch,j)=>Math.round(ch+(b[1][j]-ch)*t));return `rgb(${c[0]},${c[1]},${c[2]})`;}}
+  const l=HEAT_STOPS[HEAT_STOPS.length-1][1];return `rgb(${l[0]},${l[1]},${l[2]})`;
+}
+function heatData(){
+  const D=refDates();if(!D||D.length<HEAT_MOM+10)return null;
+  const EXT=Math.min(HEAT_L+HEAT_MOM,D.length),dispLen=EXT-HEAT_MOM;
+  if(dispLen<5)return null;
+  const dates=D.slice(-EXT).slice(HEAT_MOM);
+  const raw=[];
+  state.sectors.forEach((sec,i)=>{
+    const members=sec.companies.map(c=>histOf(c.ticker)).filter(h=>h&&h.c&&h.c.length>1).map(h=>h.c);
+    if(!members.length)return;
+    const arr=eqWeightIndex(members,EXT);if(!arr)return;
+    const mom=[];let any=false;
+    for(let c=0;c<dispLen;c++){const v=heatMom(arr,EXT,HEAT_MOM+c);mom.push(v);if(v!=null)any=true;}
+    if(any)raw.push({name:sec.name,mom});
+  });
+  if(!raw.length)return null;
+  const nrow=raw.length,pct=raw.map(()=>new Array(dispLen).fill(null));
+  for(let c=0;c<dispLen;c++){
+    const pres=[];for(let r=0;r<nrow;r++){const v=raw[r].mom[c];if(v!=null)pres.push([r,v]);}
+    pres.sort((a,b)=>a[1]-b[1]);const n=pres.length;
+    pres.forEach((p,rank)=>{pct[p[0]][c]=n>1?rank/(n-1):0.5;});
+  }
+  const mean=raw.map((_,r)=>{let s=0,n=0;for(let c=0;c<dispLen;c++)if(pct[r][c]!=null){s+=pct[r][c];n++;}return n?s/n:-1;});
+  const order=raw.map((_,r)=>r).sort((a,b)=>mean[b]-mean[a]);
+  return {rows:order.map(r=>({name:raw[r].name,pct:pct[r]})),dates,dispLen};
+}
+function drawHeat(cv,data){
+  const ctx=cv.getContext("2d"),W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
+  const light=isLight(),txt=light?"#574f3a":"#E8E2D5",faint=light?"#8a7d5e":"#8B93A0";
+  const {rows,dates,dispLen}=data,nrow=rows.length;
+  const padL=172,padR=56,padT=8,padB=22,plotW=W-padL-padR,plotH=H-padT-padB;
+  const cw=plotW/dispLen,ch=plotH/nrow;
+  for(let r=0;r<nrow;r++){
+    for(let c=0;c<dispLen;c++){ctx.fillStyle=heatColor(rows[r].pct[c]);ctx.fillRect(padL+c*cw,padT+r*ch,cw+0.6,ch+0.6);}
+    ctx.fillStyle=txt;ctx.font="12px 'Segoe UI',sans-serif";ctx.textAlign="right";ctx.textBaseline="middle";
+    const nm=rows[r].name.length>26?rows[r].name.slice(0,25)+"…":rows[r].name;
+    ctx.fillText(nm,padL-8,padT+r*ch+ch/2);
+  }
+  ctx.strokeStyle=light?"rgba(253,246,227,.5)":"rgba(14,19,24,.55)";ctx.lineWidth=1;
+  for(let r=0;r<=nrow;r++){const y=padT+r*ch;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+plotW,y);ctx.stroke();}
+  ctx.fillStyle=faint;ctx.font="10px ui-monospace,Consolas,monospace";ctx.textAlign="left";ctx.textBaseline="top";
+  let lastM=null;
+  for(let c=0;c<dispLen;c++){const d=dates[c];if(!d)continue;const m=d.slice(5,7);
+    if(m!==lastM){const day=parseInt(d.slice(8,10));lastM=m;if(c===0&&day>10)continue;
+      ctx.fillText(MONTHS_TR[parseInt(m)-1]+" '"+d.slice(2,4),padL+c*cw,H-padB+5);}}
+  const lx=W-padR+14,ly=padT,lh=plotH,lw=12;
+  const g=ctx.createLinearGradient(0,ly,0,ly+lh);
+  g.addColorStop(0,"rgb(46,139,87)");g.addColorStop(.28,"rgb(159,184,122)");g.addColorStop(.5,"rgb(232,163,61)");g.addColorStop(.75,"rgb(210,101,78)");g.addColorStop(1,"rgb(192,57,43)");
+  ctx.fillStyle=g;ctx.fillRect(lx,ly,lw,lh);
+  ctx.fillStyle=faint;ctx.font="9px ui-monospace,Consolas,monospace";ctx.textAlign="left";
+  ctx.textBaseline="bottom";ctx.fillText("güçlü",lx-1,ly-1);
+  ctx.textBaseline="top";ctx.fillText("zayıf",lx-1,ly+lh+2);
+}
 function renderRotation(){
   const el=document.getElementById("rotation");if(!el)return;
   if(!priceData||!priceData.quotes){el.innerHTML="";return;}             // fiyat verisi yoksa gizle
-  const views=[["list","Liste"],["rrg","Kadran"],["bump","Zaman"]];
+  const views=[["list","Liste"],["rrg","Kadran"],["bump","Zaman"],["heat","Isı"]];
   const viewToggle=`<span class="rot-view">${views.map(v=>`<button class="rotview ${rotView===v[0]?'on':''}" data-rv="${v[0]}" title="${v[0]==='list'?'Sıralı getiri listesi':(v[0]==='rrg'?'Rotasyon kadranı — göreli güç × momentum':'Sıralamanın zaman içindeki hareketi')}">${v[1]}</button>`).join("")}</span>`;
-  let ctrls="",body="";
+  let ctrls="",body="",heatHD=null;
   if(rotView==="list"){
     const days=(ROT_WINDOWS.find(w=>w[0]===rotationWin)||ROT_WINDOWS[1])[1];
     const R=sectorRotation(days);
@@ -1503,7 +1577,7 @@ function renderRotation(){
           <div class="rrg-note">Sektörler saat yönünde döner: İyileşiyor → Öncüler → Zayıflıyor → Geride. Nokta = bugün, kuyruk son ~${RRG_TAIL} hafta. Benchmark: ${esc(rrgBench)}.</div></div></div>`;
       }
     }
-  }else{ // bump
+  }else if(rotView==="bump"){
     ctrls=`<span class="rot-klabel">Ölçüt</span><span class="rot-win">${[["rank","Sıra"],["ret","1H getiri"]].map(m=>`<button class="rotwin ${bumpMetric===m[0]?'on':''}" data-bm="${m[0]}">${m[1]}</button>`).join("")}</span>`;
     if(rotationOpen){
       const B=bumpSeries();
@@ -1512,6 +1586,17 @@ function renderRotation(){
       else{
         body=`<div class="rrg-note" style="margin-bottom:6px">${B.n} tarama · ${esc(B.dates[0])} → ${esc(B.dates[B.dates.length-1])} · ${bumpMetric==='rank'?'üstte = daha güçlü sıra (#1 tepe)':'sektör eşit-ağırlık 1H getirisi'}</div>
           <div class="bump-wrap"><canvas class="bump-canvas" id="bumpCanvas" width="860" height="380"></canvas></div>`;
+      }
+    }
+  }else{ // heat — momentum ısı-şeridi
+    ctrls=`<span class="rot-ref">günlük · ${Math.round(HEAT_MOM/21)} ay momentum · her gün sektörler-arası sıra</span>`;
+    if(rotationOpen){
+      heatHD=heatData();
+      if(!heatHD){body=`<div class="rrg-empty">Isı-şeridi için yeterli fiyat geçmişi yok — verileri güncelle (her sektörde ~4 ay+ geçmiş gerekir).</div>`;}
+      else{
+        const HH=heatHD.rows.length*26+30;
+        body=`<div class="rrg-note" style="margin-bottom:6px">Her satır bir sektör · her gün, sektörler o günkü ${Math.round(HEAT_MOM/21)}-aylık momentuma göre sıralanır · koyu yeşil = o günün lideri, kırmızı = en zayıf</div>
+          <div class="heat-wrap"><canvas class="heat-canvas" id="heatCanvas" width="1180" height="${HH}"></canvas></div>`;
       }
     }
   }
@@ -1530,9 +1615,11 @@ function renderRotation(){
   }else if(rotView==="rrg"){
     el.querySelectorAll(".rotwin[data-rrgb]").forEach(b=>b.onclick=()=>{rrgBench=b.dataset.rrgb;localStorage.setItem("sm-rrgbench",rrgBench);renderRotation();});
     const cv=document.getElementById("rrgCanvas");if(cv){const R=rrgSeries();if(R.series&&R.series.length)drawRRG(cv,R.series);}
-  }else{
+  }else if(rotView==="bump"){
     el.querySelectorAll(".rotwin[data-bm]").forEach(b=>b.onclick=()=>{bumpMetric=b.dataset.bm;localStorage.setItem("sm-bumpmetric",bumpMetric);renderRotation();});
     const cv=document.getElementById("bumpCanvas");if(cv){const B=bumpSeries();if(B&&B.n>=2)drawBump(cv,B,bumpMetric);}
+  }else{
+    const cv=document.getElementById("heatCanvas");if(cv&&heatHD)drawHeat(cv,heatHD);
   }
 }
 
