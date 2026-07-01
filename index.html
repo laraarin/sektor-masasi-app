@@ -436,7 +436,8 @@
     #fonPrint .fpl-i{display:flex;align-items:center;gap:5px}
     #fonPrint .fpl-sw{width:9px;height:9px;border-radius:2px;flex:0 0 auto}
     #fonPrint .fpl-t{flex:1}
-    #fonPrint .fp-bars{display:flex;gap:5px;align-items:flex-start}
+    #fonPrint .fp-bars{display:block;width:100%}
+    #fonPrint .fp-bars svg{width:100%;height:auto}
     #fonPrint .fpb-col{flex:1;text-align:center;min-width:0}
     #fonPrint .fpb-plot{position:relative;height:112px;background:linear-gradient(transparent 55px,#cfcfcf 55px,#cfcfcf 57px,transparent 57px)}
     #fonPrint .fpb-bar{position:absolute;left:50%;transform:translateX(-50%);width:58%;border-radius:3px}
@@ -1735,13 +1736,24 @@ function fonPrintSummary(){
   const alloc=fonAllocCombined(keys);let ci=0;
   alloc.forEach(a=>{a.color=(a.label==="Takipsiz hisse"||a.label==="Nakit / Diğer")?FON_GREY:FON_COLORS[ci++%FON_COLORS.length];});
   const donut=donutSvg(alloc.map(a=>({label:a.label,pct:a.pct,color:a.color})),160);
-  const legend=alloc.map(a=>`<div class="fpl-i"><span class="fpl-sw" style="background:${a.color}"></span><span class="fpl-t">${esc(a.label)}</span><b>%${a.pct.toFixed(1)}</b></div>`).join("");
-  // getiri bar chart'ı
+  const legend=alloc.map(a=>`<div class="fpl-i"><svg class="fpl-sw" width="10" height="10" viewBox="0 0 10 10"><rect width="10" height="10" rx="2" fill="${a.color}"/></svg><span class="fpl-t">${esc(a.label)}</span><b>%${a.pct.toFixed(1)}</b></div>`).join("");
+  // getiri bar chart'ı — SVG (yazdırmada 'arka plan grafikleri' kapalı olsa bile çıkar)
   const maxAbs=Math.max(1,...garr.map(g=>Math.abs(g.avg||0)));
-  const bars=garr.map(g=>{const v=g.avg,has=v!=null,pos=has&&v>=0,bh=has?Math.round(Math.abs(v)/maxAbs*52):0;
-    return `<div class="fpb-col"><div class="fpb-plot"><div class="fpb-bar ${pos?"up":"down"}" style="height:${bh}px;${pos?"bottom":"top"}:56px"></div></div>`+
-      `<div class="fpb-val ${has?(pos?"up":"down"):""}">${has?((pos?"+":"")+v.toFixed(0)+"%"):"—"}</div>`+
-      `<div class="fpb-name">${esc(shortSec(g.sec))}<br>%${g.w.toFixed(0)}</div></div>`;}).join("");
+  const bars=(function(){
+    const N=garr.length||1,cw=Math.max(64,Math.min(120,Math.round(940/N))),W=N*cw,H=152,base=88,bmax=66;
+    let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" font-family="Arial,sans-serif" style="height:auto">`;
+    s+=`<line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#ccc" stroke-width="1"/>`;
+    garr.forEach((g,i)=>{const v=g.avg,x=i*cw+cw/2;
+      if(v!=null){const h=Math.max(1,Math.round(Math.abs(v)/maxAbs*bmax)),y=v>=0?base-h:base,col=v>=0?"#3aa657":"#c0503a";
+        s+=`<rect x="${(x-cw*0.28).toFixed(1)}" y="${y}" width="${(cw*0.56).toFixed(1)}" height="${h}" rx="3" fill="${col}"/>`;
+        s+=`<text x="${x}" y="${v>=0?y-4:y+h+13}" text-anchor="middle" font-size="11" font-weight="700" fill="${v>=0?"#178a3a":"#b3402a"}">${v>=0?"+":""}${v.toFixed(0)}%</text>`;
+      }else{s+=`<text x="${x}" y="${base-4}" text-anchor="middle" font-size="10" fill="#999">—</text>`;}
+      const nm=shortSec(g.sec),nm2=nm.length>15?nm.slice(0,14)+"…":nm;
+      s+=`<text x="${x}" y="${H-13}" text-anchor="middle" font-size="8.5" fill="#555">${esc(nm2)}</text>`;
+      s+=`<text x="${x}" y="${H-3}" text-anchor="middle" font-size="8.5" fill="#999">%${g.w.toFixed(0)}</text>`;
+    });
+    return s+`</svg>`;
+  })();
 
   let html=`<div class="fp-head"><h1>💼 ${esc(title)} — Fon Özeti</h1>
     <div class="fp-meta">Portföy tarihi: ${esc(fonData.asOf||"")} · Rapor: ${esc(dt)} · Getiri penceresi: ${esc(modeLbl)}</div></div>`;
