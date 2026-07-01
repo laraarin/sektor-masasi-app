@@ -433,7 +433,8 @@
   }
   .fon-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
   /* fon dağılım grafikleri (donut) */
-  .fon-donuts{display:flex;gap:30px;flex-wrap:wrap;justify-content:center;margin:8px 0 2px}
+  .fon-dist{display:flex;gap:30px;align-items:center;flex-wrap:wrap;margin:8px 0 2px}
+  .fon-donuts{display:flex;gap:30px;flex-wrap:wrap;justify-content:center;flex:1}
   .fon-donut{text-align:center;position:relative}
   .fon-donut .fd-title{font-family:var(--mono);font-size:12px;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
   .fon-donut svg{display:block;margin:0 auto}
@@ -441,7 +442,7 @@
   .fon-donut .fd-ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
   .fon-donut .fd-ctr .fd-v{font-size:16px;font-weight:680}
   .fon-donut .fd-ctr .fd-l{font-size:10px;color:var(--faint);letter-spacing:.06em}
-  .fon-legend{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;margin:12px auto 2px;max-width:780px}
+  .fon-legend{display:flex;flex-direction:column;gap:7px;flex:0 0 auto;margin:0}
   .fon-legend .fl-i{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
   .fon-legend .fl-sw{width:11px;height:11px;border-radius:3px;flex:none}
   .fon-card{cursor:pointer;transition:border-color .15s,box-shadow .15s}
@@ -1748,7 +1749,7 @@ function renderFonDonuts(fundKeys,funds){
   }).join("");
   const legend=labels.map(l=>`<span class="fl-i"><span class="fl-sw" style="background:${colMap[l]}"></span>${esc(l)}</span>`).join("");
   const title=fundKeys.length===1?("Dağılım — "+esc(fundKeys[0])):"Dağılım — Fonlar Ayrı Ayrı";
-  return `<div class="fon-sec-h">${title}</div><div class="fon-donuts">${donuts}</div><div class="fon-legend">${legend}</div>`;
+  return `<div class="fon-sec-h">${title}</div><div class="fon-dist"><div class="fon-legend">${legend}</div><div class="fon-donuts">${donuts}</div></div>`;
 }
 function renderFon(){
   const body=document.getElementById("fonBody"),ctl=document.getElementById("fonControls");
