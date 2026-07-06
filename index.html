@@ -616,6 +616,25 @@
   :root[data-theme="light"] .modal-bg{background:rgba(40,30,8,.30)}
   :root[data-theme="light"] .modal-card{box-shadow:0 30px 80px rgba(80,60,20,.22)}
   :root[data-theme="light"] .flash{box-shadow:0 10px 30px rgba(80,60,20,.25)}
+  /* ---------- Fon Akışı (💧) paneli ---------- */
+  .akis-ctrls{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .akis-seg{display:flex;gap:3px;background:var(--ground);border:1px solid var(--line-cool);border-radius:7px;padding:3px}
+  .akiswin{background:none;border:none;color:var(--muted);border-radius:5px;padding:5px 13px;font-family:var(--mono);font-size:12px}
+  .akiswin:hover{color:var(--text)}
+  .akiswin.on{background:rgba(233,165,60,.12);color:var(--accent)}
+  .akis-note{font-size:11.5px;color:var(--faint)}
+  .akis-bar{position:relative;display:block;width:130px;height:15px;background:rgba(255,255,255,.045);border-radius:3px}
+  .akis-bar .zero{position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:var(--line-cool)}
+  .akis-bar i{position:absolute;top:2px;bottom:2px;border-radius:2px}
+  :root[data-theme="light"] .akis-bar{background:rgba(87,79,58,.07)}
+  .akis-spark{display:block;width:96px;height:28px;vertical-align:middle}
+  .akis-hl{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .akis-hl .ah{flex:1;min-width:190px;background:var(--surface);border:1px solid var(--line-cool);border-radius:9px;padding:10px 13px}
+  .akis-hl .ah .ah-l{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .akis-hl .ah .ah-row{font-size:12.5px;margin:3px 0;display:flex;justify-content:space-between;gap:10px}
+  .akis-hl .ah .ah-row b{font-family:var(--mono)}
+  .akis-hl .up{color:var(--good)}
+  .akis-hl .down{color:var(--bad)}
 </style>
 <script>(function(){try{var t=localStorage.getItem("sm-theme");if(t==="light")document.documentElement.dataset.theme="light";}catch(e){}})();</script>
 
@@ -634,6 +653,7 @@
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
     <button class="btn primary" id="taramaBtn" title="Haftalık sektör rotasyon taraması">📈 Rotasyon</button>
     <button class="btn primary" id="fonBtn" title="BVV / BTK fon portföyü">💼 Fon Portföyü</button>
+    <button class="btn primary" id="akisBtn" title="ETF fon akışı — sektöre para giriş/çıkışı">💧 Fon Akışı</button>
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
     <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
     <button class="btn ghost" id="themeBtn" title="Açık / koyu tema">🌙</button>
@@ -693,6 +713,15 @@
     <button class="modal-x" data-close="tarama" title="Kapat">✕</button>
     <div class="sheet-head"><h3>📈 Haftalık Sektör Bülteni — Rotasyon</h3><div id="taramaMeta" class="regime-meta"></div></div>
     <div class="sheet-body" id="taramaBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="akisModal" hidden>
+  <div class="modal-bg" data-close="akis"></div>
+  <div class="modal-card big">
+    <button class="modal-x" data-close="akis" title="Kapat">✕</button>
+    <div class="sheet-head"><h3>💧 Fon Akışı — Sektöre Giriş / Çıkış</h3><div id="akisMeta" class="regime-meta"></div></div>
+    <div class="sheet-body" id="akisBody"></div>
   </div>
 </div>
 
@@ -779,7 +808,7 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json",akisFile:"sektor_akis.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
@@ -788,6 +817,7 @@ let regimeData=null, regimeCommit=null;  // rejim.json (Risk İştahı rejim ban
 let regimeChartUrl=null, regimeChartCommit=null;  // rejim_spx.png (rozete tıklayınca açılan grafik)
 let fonData=null, fonCommit=null, fonFund="ALL";  // fon_portfoy.json (BVV/BTK pozisyonları, fon-portfoy-uret.py üretir)
 let taramaData=null, taramaCommit=null;  // sektor-tarama.json (haftalık sektör rotasyon taraması, Actions Çar & Cum üretir)
+let akisData=null, akisCommit=null, akisWin="1h";  // sektor_akis.json (ETF fon akışı, fon-akis-uret.py üretir)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -871,6 +901,13 @@ async function ghLoadTarama(){
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.latest)taramaData=d;}
   taramaCommit=await ghLatestCommit(GH.taramaFile);
 }
+async function ghLoadAkis(){
+  const r=await ghApi("/contents/"+GH.akisFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.sectors)akisData=d;}
+  akisCommit=await ghLatestCommit(GH.akisFile);
+}
 async function ghLoadRegimeChart(){
   const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
   if(!r.ok)return;
@@ -922,6 +959,8 @@ function startGitPoll(){
       if(fc&&fc!==fonCommit){await ghLoadFon();if(!document.getElementById("fonModal").hidden)renderFon();flash("Fon portföyü güncellendi");}
       const tc=await ghLatestCommit(GH.taramaFile);
       if(tc&&tc!==taramaCommit){await ghLoadTarama();if(!document.getElementById("taramaModal").hidden)renderTarama();flash("Sektör taraması güncellendi");}
+      const ac=await ghLatestCommit(GH.akisFile);
+      if(ac&&ac!==akisCommit){await ghLoadAkis();if(!document.getElementById("akisModal").hidden)renderAkis();flash("Fon akışı güncellendi");}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -953,7 +992,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -2317,6 +2356,74 @@ function renderTarama(){
     <table class="fon-tbl"><thead><tr><th class="r">#</th><th>Sektör</th><th>1H getiri</th><th class="r">1H %</th><th class="r">Δ ivme</th><th class="r">Breadth</th><th class="r">vs ${esc(taramaData.benchmark)}</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="fon-sub-lbl" style="margin-top:10px">Δ ivme = bu taramanın 1H getirisi − önceki tarama · Breadth = sektörde artıda olan hisse % · vs ${esc(taramaData.benchmark)} = benchmark'a göre 1H ayrışma. Tarama Çar & Cum otomatik güncellenir.</div>`;
 }
+/* ---------- Fon Akışı (ETF giriş/çıkış) ---------- */
+function openAkis(){document.getElementById("akisModal").hidden=false;renderAkis();if(!akisData&&ghReady())ghLoadAkis().then(()=>{if(!document.getElementById("akisModal").hidden)renderAkis();}).catch(()=>{});}
+function closeAkis(){document.getElementById("akisModal").hidden=true;}
+function fmtFlow(v){if(v==null)return "—";const s=v<0?"−":"+";const a=Math.abs(v);let n;if(a>=1e9)n="$"+(a/1e9).toFixed(2)+"B";else if(a>=1e6)n="$"+(a/1e6).toFixed(0)+"M";else if(a>=1e3)n="$"+(a/1e3).toFixed(0)+"K";else n="$"+Math.round(a);return s+n;}
+function wireAkisCtrls(){document.querySelectorAll("#akisBody [data-aw]").forEach(b=>b.onclick=()=>{akisWin=b.dataset.aw;renderAkis();});}
+function drawAkisSparks(){
+  if(!akisData)return;
+  const byEtf={};(akisData.sectors||[]).forEach(s=>{if(s.etf)byEtf[s.etf]=s;});
+  document.querySelectorAll("#akisBody canvas.akis-spark").forEach(cv=>{
+    const s=byEtf[cv.dataset.akis];if(!s||!s.series||s.series.length<2)return;
+    drawSeries(cv,s.series.map(x=>x.cum),{lw:1.4,pad:3});
+  });
+}
+function renderAkis(){
+  const body=document.getElementById("akisBody"),meta=document.getElementById("akisMeta");
+  if(!akisData||!akisData.sectors){body.innerHTML=`<div class="fon-empty">Fon akışı verisi yok. GitHub'a bağlan; veri <code>fon-akis-uret.py</code> ile üretilir (günlük otomatik ya da elle: fon-akis-guncelle.bat).</div>`;meta.textContent="";return;}
+  let lbl="";if(akisData.updated){try{lbl=new Date(akisData.updated).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}catch(e){}}
+  const nSnap=(akisData.snapshots||[]).length;
+  meta.innerHTML=`${esc(lbl)} · ${nSnap} günlük snapshot · ETF AUM vekili`;
+  const winLabels={"1g":"1 Gün","1h":"1 Hafta","1a":"1 Ay"};
+  const seg=`<div class="akis-seg">${["1g","1h","1a"].map(k=>`<button class="akiswin ${akisWin===k?'on':''}" data-aw="${k}">${winLabels[k]}</button>`).join("")}</div>`;
+  if(nSnap<2){
+    body.innerHTML=`<div class="akis-ctrls">${seg}<span class="akis-note">Akış birikiyor — ilk anlamlı rakamlar için en az 2 günlük snapshot gerek (şu an ${nSnap}. gün).</span></div>
+      <table class="fon-tbl"><thead><tr><th>Sektör</th><th>ETF</th><th class="r">Güncel AUM</th></tr></thead><tbody>
+      ${akisData.sectors.map(s=>`<tr><td>${esc(shortSec(s.name))}</td><td><span class="fon-chip"><span class="fc-tk">${s.etf?esc(s.etf):'—'}</span></span></td><td class="r">${s.aum?fmtMC(s.aum):'—'}</td></tr>`).join("")}
+      </tbody></table>`;
+    wireAkisCtrls();return;
+  }
+  const rows=akisData.sectors.filter(s=>s.etf).map(s=>({s,f:(s.flow||{})[akisWin],p:(s.flowPct||{})[akisWin]}));
+  const withF=rows.filter(r=>r.f!=null).sort((a,b)=>b.f-a.f);
+  const noF=rows.filter(r=>r.f==null);
+  const maxAbs=Math.max(1,...withF.map(r=>Math.abs(r.f)));
+  const inflow=withF.filter(r=>r.f>0),outflow=withF.filter(r=>r.f<0);
+  const sumIn=inflow.reduce((a,r)=>a+r.f,0),sumOut=outflow.reduce((a,r)=>a+r.f,0);
+  const topIn=inflow.slice(0,3),topOut=outflow.slice(-3).reverse();
+  const hl=`<div class="akis-hl">
+    <div class="ah"><div class="ah-l">🟢 En çok giriş</div>${topIn.length?topIn.map(r=>`<div class="ah-row"><span>${esc(shortSec(r.s.name))}</span><b class="up">${fmtFlow(r.f)}</b></div>`).join(""):'<div class="ah-row"><span style="color:var(--faint)">giriş yok</span></div>'}</div>
+    <div class="ah"><div class="ah-l">🔴 En çok çıkış</div>${topOut.length?topOut.map(r=>`<div class="ah-row"><span>${esc(shortSec(r.s.name))}</span><b class="down">${fmtFlow(r.f)}</b></div>`).join(""):'<div class="ah-row"><span style="color:var(--faint)">çıkış yok</span></div>'}</div>
+    <div class="ah"><div class="ah-l">Net (${winLabels[akisWin]})</div>
+      <div class="ah-row"><span>Toplam giriş</span><b class="up">${fmtFlow(sumIn)}</b></div>
+      <div class="ah-row"><span>Toplam çıkış</span><b class="down">${fmtFlow(sumOut)}</b></div>
+      <div class="ah-row"><span>Net</span><b class="${(sumIn+sumOut)>=0?'up':'down'}">${fmtFlow(sumIn+sumOut)}</b></div></div>
+  </div>`;
+  const barCell=(f)=>{
+    const w=Math.min(50,Math.abs(f)/maxAbs*50),pos=f>=0;
+    const style=pos?`left:50%;width:${w}%;background:var(--good)`:`right:50%;width:${w}%;background:var(--bad)`;
+    return `<span class="akis-bar"><span class="zero"></span><i style="${style}"></i></span>`;
+  };
+  const trRows=withF.map(r=>{
+    const s=r.s;
+    const spark=(s.series&&s.series.length>=2)?`<canvas class="akis-spark" data-akis="${esc(s.etf)}" width="96" height="28"></canvas>`:'<span style="color:var(--faint)">—</span>';
+    return `<tr>
+      <td>${esc(shortSec(s.name))}</td>
+      <td><span class="fon-chip"><span class="fc-tk">${esc(s.etf)}</span></span></td>
+      <td>${barCell(r.f)}</td>
+      <td class="r"><b class="${r.f>=0?'up':'down'}">${fmtFlow(r.f)}</b></td>
+      <td class="r">${r.p!=null?`<span class="${r.p>=0?'up':'down'}">${r.p>=0?'+':''}${r.p}%</span>`:'—'}</td>
+      <td class="r">${s.aum?fmtMC(s.aum):'—'}</td>
+      <td>${spark}</td></tr>`;
+  }).join("");
+  const noRows=noF.map(r=>`<tr style="opacity:.5"><td>${esc(shortSec(r.s.name))}</td><td><span class="fon-chip"><span class="fc-tk">${r.s.etf?esc(r.s.etf):'—'}</span></span></td><td colspan="5" style="color:var(--faint)">veri birikiyor</td></tr>`).join("");
+  body.innerHTML=`<div class="akis-ctrls">${seg}<span class="akis-note">Akış = ETF'e net para giriş/çıkışı (fiyat etkisi ayıklanmış). Sağa/yeşil giriş, sola/kırmızı çıkış.</span></div>
+    ${hl}
+    <table class="fon-tbl"><thead><tr><th>Sektör</th><th>ETF</th><th>Giriş / Çıkış</th><th class="r">${winLabels[akisWin]} akış</th><th class="r">AUM %</th><th class="r">AUM</th><th>Trend</th></tr></thead>
+    <tbody>${trRows}${noRows}</tbody></table>
+    <div class="fon-sub-lbl" style="margin-top:10px">Kaynak: ${esc(akisData.source||"")}. Yahoo ETF'ler için anlık AUM verir; akış her gün biriken snapshot'lardan hesaplanır. Günlük rakam gürültülü olabilir — 1 Hafta / 1 Ay trendi daha güvenilirdir. Trend sütunu = kümülatif akış eğrisi.</div>`;
+  wireAkisCtrls();drawAkisSparks();
+}
 /* ---------- Risk İştahı grafiği (rozete tıklayınca) ---------- */
 function openRegimeModal(){
   document.getElementById("regimeModal").hidden=false;
@@ -2503,6 +2610,7 @@ document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("fonBtn").onclick=openFon;
 document.getElementById("taramaBtn").onclick=openTarama;
+document.getElementById("akisBtn").onclick=openAkis;
 document.getElementById("fonPrintBtn").onclick=fonPrintSummary;
 document.getElementById("fonPassGo").onclick=tryFonPass;
 document.getElementById("fonPass").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryFonPass();}});
@@ -2526,15 +2634,16 @@ document.querySelectorAll('[data-close="reports"]').forEach(el=>el.onclick=close
 document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeRegimeModal);
 document.querySelectorAll('[data-close="fon"]').forEach(el=>el.onclick=closeFon);
 document.querySelectorAll('[data-close="tarama"]').forEach(el=>el.onclick=closeTarama);
+document.querySelectorAll('[data-close="akis"]').forEach(el=>el.onclick=closeAkis);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
-document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();});
 
 /* ---------- startup ---------- */
 async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
