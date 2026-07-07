@@ -2108,10 +2108,10 @@ function fonBarSvg(groups){
     if(v!=null){const h=Math.max(1,Math.round(Math.abs(v)/maxAbs*bmax)),y=v>=0?base-h:base,col=v>=0?"#3aa657":"#c0503a";
       s+=`<rect x="${(x-cw*0.29).toFixed(1)}" y="${y}" width="${(cw*0.58).toFixed(1)}" height="${h}" rx="3" fill="${col}"/>`;
       s+=`<text x="${x}" y="${v>=0?y-4:y+h+13}" text-anchor="middle" font-size="12" font-weight="700" fill="${v>=0?"#178a3a":"#b3402a"}">${v>=0?"+":""}${v.toFixed(0)}%</text>`;
-    }else{s+=`<text x="${x}" y="${base-4}" text-anchor="middle" font-size="10" fill="#999">—</text>`;}
+    }else{s+=`<text x="${x}" y="${base-4}" text-anchor="middle" font-size="10" fill="#000">—</text>`;}
     const nm=shortSec(g.sec),nm2=nm.length>14?nm.slice(0,13)+"…":nm;
-    s+=`<text x="${x}" y="${H-13}" text-anchor="middle" font-size="9" fill="#555">${esc(nm2)}</text>`;
-    s+=`<text x="${x}" y="${H-3}" text-anchor="middle" font-size="8.5" fill="#999">%${g.w.toFixed(0)}</text>`;
+    s+=`<text x="${x}" y="${H-13}" text-anchor="middle" font-size="9" fill="#000">${esc(nm2)}</text>`;
+    s+=`<text x="${x}" y="${H-3}" text-anchor="middle" font-size="8.5" fill="#000">%${g.w.toFixed(0)}</text>`;
   });
   return s+`</svg>`;
 }
