@@ -652,7 +652,6 @@
     <div class="search"><span>⌕</span><input id="search" type="text" placeholder="Ticker veya sektör ara" aria-label="Ara" /></div>
     <button class="btn primary" id="newsBtn" title="Haber akışı">📰 Haberler</button>
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
-    <button class="btn primary" id="taramaBtn" title="Haftalık sektör rotasyon taraması">📈 Rotasyon</button>
     <button class="btn primary" id="fonBtn" title="BVV / BTK fon portföyü">💼 Fon Portföyü</button>
     <button class="btn primary" id="akisBtn" title="ETF fon akışı — sektöre para giriş/çıkışı">💧 Fon Akışı</button>
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
@@ -847,7 +846,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s10</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s12</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -1401,7 +1400,7 @@ let rotationOpen=localStorage.getItem("sm-rotopen")!=="0";
 let rotBase=localStorage.getItem("sm-rotbase")||"mutlak";   // kıyas: mutlak | evren | SPY | QQQ | IWM
 const ROT_WINDOWS=[["1H",5],["1A",21]]; // işlem günü: ~1 hafta / ~1 ay
 const BENCHES=["SPY","QQQ","IWM"];
-let rotView=localStorage.getItem("sm-rotview")||"list";      // list | rrg | bump
+let rotView=localStorage.getItem("sm-rotview")||"list"; if(rotView!=="list"&&rotView!=="heat")rotView="list";      // list | heat (Kadran/Zaman kaldırıldı)
 let rrgBench=localStorage.getItem("sm-rrgbench")||"SPY";     // RRG kadranı benchmark'ı
 let bumpMetric=localStorage.getItem("sm-bumpmetric")||"rank";// zaman çizgisi ölçütü: rank | ret
 function winReturn(closes,n){
@@ -1711,7 +1710,7 @@ function drawHeat(cv,data){
 function renderRotation(){
   const el=document.getElementById("rotation");if(!el)return;
   if(!priceData||!priceData.quotes){el.innerHTML="";return;}             // fiyat verisi yoksa gizle
-  const views=[["list","Liste"],["rrg","Kadran"],["bump","Zaman"],["heat","Isı"]];
+  const views=[["list","Liste"],["heat","Isı"]];
   const viewToggle=`<span class="rot-view">${views.map(v=>`<button class="rotview ${rotView===v[0]?'on':''}" data-rv="${v[0]}" title="${v[0]==='list'?'Sıralı getiri listesi':(v[0]==='rrg'?'Rotasyon kadranı — göreli güç × momentum':'Sıralamanın zaman içindeki hareketi')}">${v[1]}</button>`).join("")}</span>`;
   let ctrls="",body="",heatHD=null;
   if(rotView==="list"){
@@ -2850,6 +2849,7 @@ function renderTRUniverse(){
 function trRet(v){if(v==null)return '<span class="trr-na">–</span>';const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(1)}%</span>`;}
 function trPts(v){const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(2)} p</span>`;}
 function trFmtMn(v){return (v/1e6).toFixed(1).replace('.',',')+" mn ₺";}
+function trFbSec(e){return e.market==="ABD"?"ABD (Yabancı)":((e.market&&e.market!=="TR")?"Yabancı":"(Sınıfsız)");}
 function renderTRFund(){
   const d=trRapors[trFund], body=document.getElementById("trBody"), meta=document.getElementById("trBarMeta");
   if(!d){meta.textContent="";body.innerHTML=`<div style="padding:48px;text-align:center;color:var(--muted)"><div style="font-size:16px;margin-bottom:10px">📄 ${trFund} Fon Raporu</div><div class="tr-hint" style="max-width:540px;margin:0 auto">Rapor verisi özel repodan gelir. Görmek için ABD tarafında sağ üstten <b>Token</b> gir. fon_database güncellenince rapor otomatik yenilenir.</div></div>`;return;}
@@ -2861,7 +2861,7 @@ function renderTRFund(){
   const retStrip=`<div class="trg"><div class="trg-i"><span class="trg-k">Günlük</span><span class="trg-v">${trRet(er.d)}</span></div><div class="trg-i"><span class="trg-k">Haftalık</span><span class="trg-v">${trRet(er.w)}</span></div><div class="trg-i"><span class="trg-k">Aylık</span><span class="trg-v">${trRet(er.m)}</span></div></div>`;
   const bySec={};
   d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let tot=0;for(const s in m)tot+=(+m[s]||0);
-    const tg=tot>0?Object.keys(m).map(s=>[s,(+m[s]||0)/tot]):[["(Sınıfsız)",1]];
+    const tg=tot>0?Object.keys(m).map(s=>[s,(+m[s]||0)/tot]):[[trFbSec(e),1]];
     tg.forEach(([s,sh])=>{const w=e.wEq*sh;const o=bySec[s]||(bySec[s]={w:0,wn:0,wd:0});o.w+=w;if(e.ret1w!=null){o.wn+=w*e.ret1w;o.wd+=w;}});});
   const unc=(bySec["(Sınıfsız)"]||{}).w||0;
   const contrib=d.equities.filter(e=>e.ret1w!=null).map(e=>({t:e.ticker,c:e.wEq*e.ret1w/100})).sort((a,b)=>b.c-a.c);
@@ -2869,14 +2869,14 @@ function renderTRFund(){
   const ci=(arr)=>arr.length?arr.map(x=>`<div class="trr-ci"><span>${x.t}</span>${trPts(x.c)}</div>`).join(""):`<div class="tr-hint">—</div>`;
   const PER={d:'ret1d',w:'ret1w',m:'ret1m'}, perKey=PER[trFundPeriod]||'ret1w';
   const posBySec={};
-  d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let t=0;for(const k in m)t+=(+m[k]||0);const tg=t>0?Object.keys(m).map(k=>[k,(+m[k]||0)/t]):[["(Sınıfsız)",1]];tg.forEach(([s,sh])=>{(posBySec[s]=posBySec[s]||[]).push({tk:e.ticker,w:e.wEq*sh,r:e[perKey]});});});
+  d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let t=0;for(const k in m)t+=(+m[k]||0);const tg=t>0?Object.keys(m).map(k=>[k,(+m[k]||0)/t]):[[trFbSec(e),1]];tg.forEach(([s,sh])=>{(posBySec[s]=posBySec[s]||[]).push({tk:e.ticker,w:e.wEq*sh,r:e[perKey]});});});
   const posSecs=Object.entries(posBySec).map(([s,arr])=>{arr.sort((a,b)=>b.w-a.w);const w=arr.reduce((a,x)=>a+x.w,0);let rn=0,rd=0;arr.forEach(x=>{if(x.r!=null){rn+=x.w*x.r;rd+=x.w;}});return{s,arr,w,r:rd?rn/rd:null};}).sort((a,b)=>(b.r==null?-1e9:b.r)-(a.r==null?-1e9:a.r));
   const rmax=Math.max(...posSecs.map(x=>Math.abs(x.r||0)),1);
   const chart=posSecs.map(sec=>{const r=sec.r,up=r!=null&&r>=0,h=r!=null?Math.abs(r)/rmax*100:0;return `<div class="trsb-col" title="${sec.s} · %${sec.w.toFixed(1)} ağırlık"><div class="trsb-val ${r>0?'trr-up':(r<0?'trr-dn':'')}">${r!=null?(r>0?'+':'')+r.toFixed(0):''}</div><div class="trsb-up"><i style="height:${up?h.toFixed(0):0}%;background:var(--good)"></i></div><div class="trsb-mid"></div><div class="trsb-dn"><i style="height:${(!up&&r!=null)?h.toFixed(0):0}%;background:var(--bad)"></i></div><div class="trsb-lbl">${sec.s}</div></div>`;}).join("");
   const posCards=posSecs.map(sec=>{const chips=sec.arr.map(x=>`<div class="trp-row"><span class="trp-tk">${x.tk}</span><span class="trp-wv">%${x.w.toFixed(1)}</span><span class="trp-rv">${trRet(x.r)}</span></div>`).join("");return `<div class="trp-card"><div class="trp-ret">${trRet(sec.r)}</div><div class="trp-name">${sec.s}</div><div class="trp-subw">%${sec.w.toFixed(1)} ağırlık · ${sec.arr.length} hisse</div><div class="trp-rows">${chips}</div></div>`;}).join("");
   const perBtns=['d','w','m'].map(p=>`<button class="trp-pbtn${trFundPeriod===p?' on':''}" data-per="${p}">${p==='d'?'1G':p==='w'?'1H':'1A'}</button>`).join('');
   const uni=new Set(trAllStocks());
-  const missing=d.equities.map(e=>e.ticker).filter(t=>!uni.has(t));
+  const missing=d.equities.filter(e=>(e.market==="TR"||!e.market)&&!uni.has(e.ticker)).map(e=>e.ticker);
   const warn=missing.length?`<div class="trr-warn">⚠️ Raporda olup Yatırım Evreni'nde olmayan <b>${missing.length}</b> hisse: ${missing.join(", ")}<button class="tr-addsec" id="trAddMissing" style="margin-left:auto">+ Evrene ekle ve güncelle</button></div>`:"";
   const bb=d.bondBuckets||[], bonds=d.bonds||[];
   let bondHtml="";
@@ -2913,7 +2913,6 @@ document.getElementById("trPass").addEventListener("keydown",e=>{if(e.key==="Ent
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("fonBtn").onclick=openFon;
-document.getElementById("taramaBtn").onclick=openTarama;
 document.getElementById("akisBtn").onclick=openAkis;
 document.getElementById("fonPrintBtn").onclick=fonPrintSummary;
 document.getElementById("fonPassGo").onclick=tryFonPass;
