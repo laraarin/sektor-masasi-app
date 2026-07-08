@@ -754,6 +754,28 @@ table.trm thead th.trm-tot{z-index:4}
 table.trm tr.trm-empty td.trm-tot{color:var(--accent)}
 table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .tr-addsec{background:transparent;border:1px dashed var(--line-cool);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer}
+.tru-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;align-items:start}
+.tru-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 13px;display:flex;flex-direction:column}
+.tru-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.tru-name{font-weight:600;font-size:13px;color:var(--text)}
+.tru-cnt{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border-radius:20px;padding:1px 7px}
+.tru-add{margin-left:auto;background:transparent;border:1px dashed var(--line-cool);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer}
+.tru-add:hover{color:var(--accent);border-color:var(--accent)}
+.tru-chips{display:flex;flex-direction:column;gap:5px}
+.tru-chip{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+.tru-chip.tru-warn{border-color:var(--accent)}
+.tru-tk{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);flex:1}
+.tru-w{width:46px;background:var(--ground);border:1px solid var(--line-cool);color:var(--text);border-radius:5px;padding:3px 5px;font-family:var(--mono);font-size:12px;text-align:right;outline:none}
+.tru-w:focus{border-color:var(--accent-2)}
+.tru-pct{color:var(--muted);font-family:var(--mono);font-size:11px}
+.tru-x{background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:16px;line-height:1;padding:0 2px}
+.tru-x:hover{color:var(--bad)}
+.tru-newsec{align-items:center;justify-content:center;border-style:dashed;min-height:76px}
+.tru-newbtn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px}
+.tru-newbtn:hover{color:var(--accent)}
+.tru-unclassified .tru-chips{flex-direction:row;flex-wrap:wrap}
+.tru-uchip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line-cool);border-radius:5px;padding:3px 7px;cursor:pointer}
+.tru-uchip:hover{color:var(--accent);border-color:var(--accent)}
 .trr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:820px){.trr-grid{grid-template-columns:1fr}}
 .trr-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
@@ -2745,34 +2767,41 @@ function tryTRPass(){
 }
 function trSetTab(t){trTab=t;document.getElementById("trTabUni").classList.toggle("active",t==="uni");document.getElementById("trTabFund").classList.toggle("active",t==="fund");renderTR();}
 function renderTR(){if(trTab==="uni")renderTRUniverse();else renderTRFund();}
+let trUniFilter="";
 function renderTRUniverse(){
   const secs=trSectors, stocks=trAllStocks();
-  const head=`<tr><th class="trm-tk">Hisse</th>`+secs.map(s=>`<th class="trm-sec" title="${s}">${s}</th>`).join("")+`<th class="trm-tot">Top</th></tr>`;
-  let body="";
-  stocks.forEach(tk=>{
-    const tot=trRowTotal(tk);
-    const cls=tot===0?"trm-empty":(Math.abs(tot-100)<0.05?"trm-full":"");
-    body+=`<tr class="${cls}" data-row="${tk}"><td class="trm-tk">${tk}</td>`+
-      secs.map(s=>{const v=trCell(tk,s);return `<td><input class="trm-c${v?'':' z'}" data-tk="${tk}" data-sec="${s}" value="${v||''}" inputmode="numeric"></td>`;}).join("")+
-      `<td class="trm-tot" id="tot-${tk}">${tot||''}</td></tr>`;
+  const unclassified=stocks.filter(tk=>trRowTotal(tk)===0);
+  let cards="";
+  secs.forEach(s=>{
+    const inSec=stocks.filter(tk=>trCell(tk,s)>0);
+    const chips=inSec.map(tk=>{
+      const v=trCell(tk,s),tot=trRowTotal(tk),warn=Math.abs(tot-100)>=0.05;
+      return `<div class="tru-chip${warn?' tru-warn':''}" data-tk="${tk}" title="${tk} · toplam %${tot.toFixed(0)}"><span class="tru-tk">${tk}</span><input class="tru-w" data-tk="${tk}" data-sec="${s}" value="${v}" inputmode="numeric"><span class="tru-pct">%</span><button class="tru-x" data-tk="${tk}" data-sec="${s}" title="Sektörden çıkar">×</button></div>`;
+    }).join("");
+    cards+=`<div class="tru-card"><div class="tru-head"><span class="tru-name">${s}</span><span class="tru-cnt">${inSec.length}</span><button class="tru-add" data-sec="${s}">+ hisse</button></div><div class="tru-chips">${chips||'<span class="tr-hint">— boş —</span>'}</div></div>`;
   });
+  cards+=`<div class="tru-card tru-newsec"><button class="tru-newbtn" id="trAddSec">+ yeni sektör</button></div>`;
+  let unclHtml="";
+  if(unclassified.length){
+    const uc=unclassified.map(tk=>`<button class="tru-uchip" data-tk="${tk}" title="Sektöre ata">${tk}</button>`).join("");
+    unclHtml=`<div class="tru-card tru-unclassified" style="margin-top:12px"><div class="tru-head"><span class="tru-name">Sınıfsız</span><span class="tru-cnt">${unclassified.length}</span></div><div class="tru-chips">${uc}</div><div class="tr-hint" style="margin-top:8px">Bir hisseye tıkla → sektör ata (varsayılan %100).</div></div>`;
+  }
   document.getElementById("trBody").innerHTML=`<div class="tr-toolbar">
-      <input class="tr-filter" id="trFilter" placeholder="Hisse ara (örn. SAHOL)">
+      <input class="tr-filter" id="trFilter" placeholder="Hisse ara (örn. SAHOL)" value="${trUniFilter}">
       <button class="tr-addsec" id="trAddStock">+ hisse ekle</button>
-      <button class="tr-addsec" id="trAddSec">+ sektör (kolon) ekle</button>
-      <span class="tr-hint">Her hisse için sektör yüzdelerini gir · satır 100 → yeşil · boş → kırmızı · bir hisse birden çok sektöre bölünebilir</span>
+      <span class="tr-hint">Her sektör bir kutu · altına hisse ekle, yüzdesini gir · aynı hisse birden çok sektörde olabilir (ör. %60 Banka + %40 Holding) · turuncu = toplamı 100 değil</span>
     </div>
-    <div class="trm-wrap"><table class="trm"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+    <div class="tru-grid">${cards}</div>${unclHtml}`;
   document.getElementById("trBarMeta").textContent=`Fon: ${trFund} · ${stocks.length} hisse · ${secs.length} sektör`;
-  document.querySelectorAll("#trBody .trm-c").forEach(inp=>{
-    inp.onchange=()=>{let v=parseFloat(inp.value);if(isNaN(v)||v<0)v=0;if(v>100)v=100;trSetCell(inp.dataset.tk,inp.dataset.sec,v);
-      inp.classList.toggle("z",!v);inp.value=v||'';
-      const tk=inp.dataset.tk,tot=trRowTotal(tk),tc=document.getElementById("tot-"+tk);if(tc)tc.textContent=tot||'';
-      const row=inp.closest("tr");row.classList.remove("trm-empty","trm-full");if(tot===0)row.classList.add("trm-empty");else if(Math.abs(tot-100)<0.05)row.classList.add("trm-full");};
-  });
-  document.getElementById("trFilter").oninput=e=>{const q=e.target.value.trim().toUpperCase();document.querySelectorAll("#trBody tbody tr").forEach(row=>{row.style.display=(!q||row.dataset.row.indexOf(q)>=0)?"":"none";});};
-  document.getElementById("trAddSec").onclick=()=>{const n=prompt("Yeni sektör (kolon) adı:");if(n&&n.trim()&&!trSectors.includes(n.trim())){trSectors.push(n.trim());saveTRSectors();renderTRUniverse();}};
-  document.getElementById("trAddStock").onclick=()=>{const t=prompt("Yeni hisse kodu (örn. TCELL):");if(!t||!t.trim())return;const tk=t.trim().toUpperCase();if(trAllStocks().includes(tk)){alert(tk+" zaten listede.");return;}trCustomStocks.push(tk);saveTRStocks();renderTRUniverse();const q=document.getElementById("trFilter");if(q){q.value=tk;q.dispatchEvent(new Event("input"));}};
+  const applyF=()=>{const q=trUniFilter.trim().toUpperCase();document.querySelectorAll("#trBody .tru-chip,#trBody .tru-uchip").forEach(ch=>{ch.style.display=(!q||(ch.dataset.tk||"").toUpperCase().indexOf(q)>=0)?"":"none";});};
+  applyF();
+  document.querySelectorAll("#trBody .tru-w").forEach(inp=>{inp.onchange=()=>{let v=parseFloat(inp.value);if(isNaN(v)||v<0)v=0;if(v>100)v=100;trSetCell(inp.dataset.tk,inp.dataset.sec,v);renderTRUniverse();};});
+  document.querySelectorAll("#trBody .tru-x").forEach(b=>{b.onclick=()=>{trSetCell(b.dataset.tk,b.dataset.sec,0);renderTRUniverse();};});
+  document.querySelectorAll("#trBody .tru-add").forEach(b=>{b.onclick=()=>{const t=prompt("Bu sektöre eklenecek hisse kodu:");if(!t||!t.trim())return;const tk=t.trim().toUpperCase();if(!trAllStocks().includes(tk)){trCustomStocks.push(tk);saveTRStocks();}if(!trCell(tk,b.dataset.sec))trSetCell(tk,b.dataset.sec,100);renderTRUniverse();};});
+  document.querySelectorAll("#trBody .tru-uchip").forEach(b=>{b.onclick=()=>{const s=prompt("Hangi sektöre atansın?\nMevcut: "+trSectors.join(", "));if(!s||!s.trim())return;const sec=s.trim();if(!trSectors.includes(sec)){if(!confirm('"'+sec+'" yeni sektör olarak eklensin mi?'))return;trSectors.push(sec);saveTRSectors();}trSetCell(b.dataset.tk,sec,100);renderTRUniverse();};});
+  document.getElementById("trFilter").oninput=e=>{trUniFilter=e.target.value;applyF();};
+  document.getElementById("trAddStock").onclick=()=>{const t=prompt("Yeni hisse kodu (evrene eklenir, sonra sektöre atarsın):");if(!t||!t.trim())return;const tk=t.trim().toUpperCase();if(trAllStocks().includes(tk)){alert(tk+" zaten var.");return;}trCustomStocks.push(tk);saveTRStocks();renderTRUniverse();};
+  document.getElementById("trAddSec").onclick=()=>{const n=prompt("Yeni sektör adı:");if(n&&n.trim()&&!trSectors.includes(n.trim())){trSectors.push(n.trim());saveTRSectors();renderTRUniverse();}};
 }
 function trRet(v){if(v==null)return '<span class="trr-na">–</span>';const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(1)}%</span>`;}
 function trPts(v){const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(2)} p</span>`;}
