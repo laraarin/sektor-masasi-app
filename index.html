@@ -774,6 +774,17 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .trr-tbl th,.trr-tbl td{padding:5px 10px;border-bottom:1px solid var(--line);text-align:left}
 .trr-tbl th.r,.trr-tbl td.r{text-align:right;font-family:var(--mono)}
 .trr-tbl th{color:var(--muted);font-weight:600}
+.trr-warn{background:rgba(230,165,40,.13);border:1px solid var(--accent);color:var(--text);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.trr-tools{display:flex;justify-content:flex-end;margin-bottom:10px}
+#trLock{flex:1;display:flex;align-items:center;justify-content:center;padding:20px}
+#trLock[hidden]{display:none}
+.trlk{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:32px 34px;text-align:center;max-width:340px;width:100%}
+.trlk .ic{font-size:34px;margin-bottom:10px}
+.trlk .t{font-weight:700;font-size:16px;color:var(--text);margin-bottom:6px}
+.trlk .s{color:var(--muted);font-size:13px;margin-bottom:16px}
+.trlk input{width:100%;background:var(--surface-2);border:1px solid var(--line-cool);color:var(--text);border-radius:8px;padding:10px 12px;font-size:15px;text-align:center;letter-spacing:3px;outline:none;box-sizing:border-box}
+.trlk input:focus{border-color:var(--accent-2)}
+.trlk .err{color:var(--bad);font-size:12px;min-height:16px;margin-top:10px}
 </style>
 
 <div class="tr-sheet" id="trSheet" hidden>
@@ -785,6 +796,16 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
     </div>
     <div id="trBarMeta" class="tr-hint"></div>
     <button class="btn ghost sm" data-close="tr" title="ABD tarafına dön" style="margin-left:auto">✕ ABD'ye dön</button>
+  </div>
+  <div id="trLock" hidden>
+    <div class="trlk">
+      <div class="ic">🔒</div>
+      <div class="t">TR Terminal — Korumalı</div>
+      <div class="s">Devam etmek için şifre gir.</div>
+      <input id="trPass" type="password" autocomplete="off" placeholder="••••••" aria-label="Şifre">
+      <button class="btn primary" id="trPassGo" style="width:100%;margin-top:12px">Giriş</button>
+      <div class="err" id="trPassErr"></div>
+    </div>
   </div>
   <div class="tr-body" id="trBody"></div>
 </div>
@@ -2697,8 +2718,22 @@ function saveTRSectors(){try{localStorage.setItem("sm-tr-sectors",JSON.stringify
 function trCell(tk,sec){const f=trMap[trFund]||{};const m=f[tk]||{};return m[sec]||0;}
 function trSetCell(tk,sec,v){trMap[trFund]=trMap[trFund]||{};trMap[trFund][tk]=trMap[trFund][tk]||{};if(v)trMap[trFund][tk][sec]=v;else delete trMap[trFund][tk][sec];saveTRMap();}
 function trRowTotal(tk){const m=(trMap[trFund]||{})[tk]||{};return Object.values(m).reduce((a,b)=>a+(Number(b)||0),0);}
-function openTR(){document.getElementById("trSheet").hidden=false;renderTR();}
+const TR_PASS="BV888";
+function trUnlocked(){try{return sessionStorage.getItem("sm-tr-unlock")==="1";}catch(e){return false;}}
+function trShowContent(){document.getElementById("trLock").hidden=true;document.getElementById("trBody").hidden=false;renderTR();}
+function openTR(){
+  document.getElementById("trSheet").hidden=false;
+  if(trUnlocked()){trShowContent();return;}
+  document.getElementById("trBody").hidden=true;
+  document.getElementById("trLock").hidden=false;
+  const i=document.getElementById("trPass");if(i){i.value="";document.getElementById("trPassErr").textContent="";setTimeout(()=>i.focus(),60);}
+}
 function closeTR(){document.getElementById("trSheet").hidden=true;}
+function tryTRPass(){
+  const i=document.getElementById("trPass"),e=document.getElementById("trPassErr");
+  if(i.value===TR_PASS){try{sessionStorage.setItem("sm-tr-unlock","1");}catch(_){}trShowContent();}
+  else{e.textContent="Hatalı şifre";i.value="";i.focus();}
+}
 function trSetTab(t){trTab=t;document.getElementById("trTabUni").classList.toggle("active",t==="uni");document.getElementById("trTabFund").classList.toggle("active",t==="fund");renderTR();}
 function renderTR(){if(trTab==="uni")renderTRUniverse();else renderTRFund();}
 function renderTRUniverse(){
@@ -2753,7 +2788,10 @@ function renderTRFund(){
   const win=contrib.filter(x=>x.c>0).slice(0,6), los=contrib.filter(x=>x.c<0).slice(-6).reverse();
   const ci=(arr)=>arr.length?arr.map(x=>`<div class="trr-ci"><span>${x.t}</span>${trPts(x.c)}</div>`).join(""):`<div class="tr-hint">—</div>`;
   const rows=d.equities.map(e=>`<tr><td class="trm-tk">${e.ticker}</td><td class="r">%${e.wFund.toFixed(2)}</td><td class="r">%${e.wEq.toFixed(2)}</td><td class="r">${trRet(e.ret1d)}</td><td class="r">${trRet(e.ret1w)}</td><td class="r">${trRet(e.ret1m)}</td></tr>`).join("");
-  body.innerHTML=`
+  const uni=new Set(trAllStocks());
+  const missing=d.equities.map(e=>e.ticker).filter(t=>!uni.has(t));
+  const warn=missing.length?`<div class="trr-warn">⚠️ Raporda olup Yatırım Evreni'nde olmayan <b>${missing.length}</b> hisse: ${missing.join(", ")}<button class="tr-addsec" id="trAddMissing" style="margin-left:auto">+ Evrene ekle ve güncelle</button></div>`:"";
+  body.innerHTML=`${warn}<div class="trr-tools"><button class="tr-addsec" id="trRecalc">🔄 Yeniden hesapla</button></div>
     <div class="trr-grid">
       <div class="trr-card"><div class="trr-h">Varlık Dağılımı</div>${assetRows}</div>
       <div class="trr-card"><div class="trr-h">Hisse Portföyü Getirisi <span class="trr-sub">(piyasa · ağırlıklı)</span></div>${retTiles}<div class="tr-hint" style="margin-top:10px">yfinance kapanış fiyatlarından, hisse ağırlıklarıyla. VİOP/temettü hariç, yaklaşık.</div></div>
@@ -2765,10 +2803,14 @@ function renderTRFund(){
     </div>
     <div class="trr-card" style="margin-top:14px"><div class="trr-h">Hisse Pozisyonları <span class="trr-sub">(${d.equities.length})</span></div>
       <div style="overflow:auto"><table class="trr-tbl"><thead><tr><th>Hisse</th><th class="r">Fon %</th><th class="r">Hisse %</th><th class="r">1G</th><th class="r">1H</th><th class="r">1A</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  const am=document.getElementById("trAddMissing");if(am)am.onclick=()=>{missing.forEach(t=>{if(!trAllStocks().includes(t))trCustomStocks.push(t);});saveTRStocks();flash(missing.length+" hisse Yatırım Evreni'ne eklendi");renderTRFund();};
+  document.getElementById("trRecalc").onclick=()=>renderTRFund();
 }
 document.getElementById("trBtn").onclick=openTR;
 document.getElementById("trTabUni").onclick=()=>trSetTab("uni");
 document.getElementById("trTabFund").onclick=()=>trSetTab("fund");
+document.getElementById("trPassGo").onclick=tryTRPass;
+document.getElementById("trPass").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryTRPass();}});
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("fonBtn").onclick=openFon;
