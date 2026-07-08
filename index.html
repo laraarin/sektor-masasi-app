@@ -812,7 +812,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal</span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s8</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -2751,6 +2751,14 @@ function saveTRSectors(){try{localStorage.setItem("sm-tr-sectors",JSON.stringify
 function trCell(tk,sec){const m=trMap[tk]||{};return m[sec]||0;}
 function trSetCell(tk,sec,v){trMap[tk]=trMap[tk]||{};if(v)trMap[tk][sec]=v;else delete trMap[tk][sec];saveTRMap();}
 function trRowTotal(tk){const m=trMap[tk]||{};return Object.values(m).reduce((a,b)=>a+(Number(b)||0),0);}
+// Tanınan boştaki hisseleri BİR KEZ otomatik sınıflandır (buton beklemeden). Lara sonra düzeltir.
+try{
+  if(!localStorage.getItem("sm-tr-autoapplied")){
+    let _n=0; trAllStocks().forEach(tk=>{const s=TR_AUTO[tk];if(s&&trRowTotal(tk)===0){if(!trSectors.includes(s))trSectors.push(s);trMap[tk]={[s]:100};_n++;}});
+    if(_n){saveTRMap();saveTRSectors();}
+    localStorage.setItem("sm-tr-autoapplied","1");
+  }
+}catch(e){}
 const TR_PASS="BV888";
 function trUnlocked(){try{return sessionStorage.getItem("sm-tr-unlock")==="1";}catch(e){return false;}}
 function trShowContent(){document.getElementById("trLock").hidden=true;document.getElementById("trBody").hidden=false;renderTR();}
