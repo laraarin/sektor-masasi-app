@@ -2800,12 +2800,22 @@ function renderTRFund(){
   const uni=new Set(trAllStocks());
   const missing=d.equities.map(e=>e.ticker).filter(t=>!uni.has(t));
   const warn=missing.length?`<div class="trr-warn">⚠️ Raporda olup Yatırım Evreni'nde olmayan <b>${missing.length}</b> hisse: ${missing.join(", ")}<button class="tr-addsec" id="trAddMissing" style="margin-left:auto">+ Evrene ekle ve güncelle</button></div>`:"";
+  const bb=d.bondBuckets||[], bonds=d.bonds||[];
+  let bondHtml="";
+  if(bb.length){
+    const bmax=Math.max(...bb.map(x=>x.pct),1);
+    const bRows=bb.map(x=>`<div class="trr-bar"><div class="trr-bl">${x.bucket}</div><div class="trr-bt"><div class="trr-bf" style="width:${(x.pct/bmax*100).toFixed(1)}%"></div></div><div class="trr-bv">%${x.pct.toFixed(1)} <span class="trr-sub">${x.avgVade!=null?x.avgVade+'g vade':''} · ${x.count} adet</span></div></div>`).join("");
+    const bTbl=bonds.map(b=>`<tr><td class="trm-tk">${b.isin}</td><td>${b.issuer||'–'}</td><td>${b.bucket}</td><td>${b.getiriTuru||'–'}</td><td class="r">${b.vadeGun!=null?b.vadeGun:'–'}</td><td class="r">${(b.tl/1e6).toFixed(1)}</td><td class="r">%${b.wFund.toFixed(2)}</td></tr>`).join("");
+    bondHtml=`<div class="trr-card" style="margin-top:14px"><div class="trr-h">Borçlanma Araçları <span class="trr-sub">(BIST tbliste eşleşmesi · toplam %${(d.bondTl/d.totalTl*100).toFixed(1)})</span></div>${bRows}
+      <div style="overflow:auto;margin-top:12px"><table class="trr-tbl"><thead><tr><th>ISIN</th><th>İhraççı</th><th>Tür</th><th>Getiri</th><th class="r">Vade (g)</th><th class="r">mn ₺</th><th class="r">Fon %</th></tr></thead><tbody>${bTbl}</tbody></table></div></div>`;
+  }
   body.innerHTML=`${warn}<div class="trr-tools"><button class="tr-addsec" id="trRecalc">🔄 Yeniden hesapla</button></div>
     <div class="trr-grid">
       <div class="trr-card"><div class="trr-h">Varlık Dağılımı</div>${assetRows}</div>
       <div class="trr-card"><div class="trr-h">Hisse Portföyü Getirisi <span class="trr-sub">(piyasa · ağırlıklı)</span></div>${retTiles}<div class="tr-hint" style="margin-top:10px">yfinance kapanış fiyatlarından, hisse ağırlıklarıyla. VİOP/temettü hariç, yaklaşık.</div></div>
     </div>
     <div class="trr-card" style="margin-top:14px"><div class="trr-h">Sektörel Dağılım <span class="trr-sub">(hisse portföyü · kişisel eşleme${unc>0?` · sınıfsız %${unc.toFixed(1)}`:''})</span></div>${secRows}</div>
+    ${bondHtml}
     <div class="trr-grid" style="margin-top:14px">
       <div class="trr-card"><div class="trr-h">🟢 En çok kazandıran <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(win)}</div>
       <div class="trr-card"><div class="trr-h">🔴 En çok kaybettiren <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(los)}</div>
