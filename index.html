@@ -776,6 +776,22 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .tru-unclassified .tru-chips{flex-direction:row;flex-wrap:wrap}
 .tru-uchip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line-cool);border-radius:5px;padding:3px 7px;cursor:pointer}
 .tru-uchip:hover{color:var(--accent);border-color:var(--accent)}
+.trp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-items:start}
+.trp-card{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.trp-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.trp-name{font-weight:600;font-size:12px;color:var(--text);flex:1}
+.trp-sw{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.trp-sr{font-family:var(--mono);font-size:12px;min-width:48px;text-align:right}
+.trp-rows{display:flex;flex-direction:column;gap:5px}
+.trp-row{display:grid;grid-template-columns:58px 1fr 40px 46px;align-items:center;gap:7px;font-size:11px}
+.trp-tk{font-family:var(--mono);font-weight:600;color:var(--text)}
+.trp-bar{height:6px;background:var(--ground);border-radius:3px;overflow:hidden}
+.trp-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.trp-wv{font-family:var(--mono);color:var(--muted);text-align:right}
+.trp-rv{font-family:var(--mono);text-align:right}
+.trp-per{margin-left:auto;display:inline-flex;gap:3px}
+.trp-pbtn{background:transparent;border:1px solid var(--line-cool);color:var(--muted);border-radius:5px;padding:2px 9px;font-size:11px;cursor:pointer}
+.trp-pbtn.on{background:var(--accent);border-color:var(--accent);color:#1a1204;font-weight:600}
 .trr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:820px){.trr-grid{grid-template-columns:1fr}}
 .trr-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
@@ -812,7 +828,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s8</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s9</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -2777,7 +2793,7 @@ function tryTRPass(){
 }
 function trSetTab(t){trTab=t;document.getElementById("trTabUni").classList.toggle("active",t==="uni");document.getElementById("trTabFund").classList.toggle("active",t==="fund");renderTR();}
 function renderTR(){if(trTab==="uni")renderTRUniverse();else renderTRFund();}
-let trUniFilter="";
+let trUniFilter="", trFundPeriod="w";
 function renderTRUniverse(){
   const secs=trSectors, stocks=trAllStocks();
   const unclassified=stocks.filter(tk=>trRowTotal(tk)===0);
@@ -2799,8 +2815,6 @@ function renderTRUniverse(){
   document.getElementById("trBody").innerHTML=`<div class="tr-toolbar">
       <input class="tr-filter" id="trFilter" placeholder="Hisse ara (örn. SAHOL)" value="${trUniFilter}">
       <button class="tr-addsec" id="trAddStock">+ hisse ekle</button>
-      <button class="tr-addsec" id="trAutoClass">🤖 Otomatik sınıflandır</button>
-      <span class="tr-hint">Her sektör bir kutu · altına hisse ekle, yüzdesini gir · aynı hisse birden çok sektörde olabilir (ör. %60 Banka + %40 Holding) · turuncu = toplamı 100 değil</span>
     </div>
     <div class="tru-grid">${cards}</div>${unclHtml}`;
   document.getElementById("trBarMeta").textContent=`Fon: ${trFund} · ${stocks.length} hisse · ${secs.length} sektör`;
@@ -2813,13 +2827,6 @@ function renderTRUniverse(){
   document.getElementById("trFilter").oninput=e=>{trUniFilter=e.target.value;applyF();};
   document.getElementById("trAddStock").onclick=()=>{const t=prompt("Yeni hisse kodu (evrene eklenir, sonra sektöre atarsın):");if(!t||!t.trim())return;const tk=t.trim().toUpperCase();if(trAllStocks().includes(tk)){alert(tk+" zaten var.");return;}trCustomStocks.push(tk);saveTRStocks();renderTRUniverse();};
   document.getElementById("trAddSec").onclick=()=>{const n=prompt("Yeni sektör adı:");if(n&&n.trim()&&!trSectors.includes(n.trim())){trSectors.push(n.trim());saveTRSectors();renderTRUniverse();}};
-  document.getElementById("trAutoClass").onclick=()=>{
-    const targets=trAllStocks().filter(tk=>trRowTotal(tk)===0 && TR_AUTO[tk]);
-    if(!targets.length){alert("Sınıflandırılacak boşta hisse yok (tanınanlar zaten atanmış).");return;}
-    if(!confirm(targets.length+" boştaki hisse otomatik sektöre atanacak (%100 varsayılan). Elle yaptıkların korunur. Devam?"))return;
-    targets.forEach(tk=>{const s=TR_AUTO[tk];if(!trSectors.includes(s))trSectors.push(s);trMap[tk]={[s]:100};});
-    saveTRSectors();saveTRMap();flash(targets.length+" hisse otomatik sınıflandırıldı — kontrol edip düzeltebilirsin");renderTRUniverse();
-  };
 }
 function trRet(v){if(v==null)return '<span class="trr-na">–</span>';const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(1)}%</span>`;}
 function trPts(v){const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(2)} p</span>`;}
@@ -2843,7 +2850,13 @@ function renderTRFund(){
   const contrib=d.equities.filter(e=>e.ret1w!=null).map(e=>({t:e.ticker,c:e.wEq*e.ret1w/100})).sort((a,b)=>b.c-a.c);
   const win=contrib.filter(x=>x.c>0).slice(0,6), los=contrib.filter(x=>x.c<0).slice(-6).reverse();
   const ci=(arr)=>arr.length?arr.map(x=>`<div class="trr-ci"><span>${x.t}</span>${trPts(x.c)}</div>`).join(""):`<div class="tr-hint">—</div>`;
-  const rows=d.equities.map(e=>`<tr><td class="trm-tk">${e.ticker}</td><td class="r">%${e.wFund.toFixed(2)}</td><td class="r">%${e.wEq.toFixed(2)}</td><td class="r">${trRet(e.ret1d)}</td><td class="r">${trRet(e.ret1w)}</td><td class="r">${trRet(e.ret1m)}</td></tr>`).join("");
+  const PER={d:'ret1d',w:'ret1w',m:'ret1m'}, perKey=PER[trFundPeriod]||'ret1w';
+  const posBySec={};
+  d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let t=0;for(const k in m)t+=(+m[k]||0);const tg=t>0?Object.keys(m).map(k=>[k,(+m[k]||0)/t]):[["(Sınıfsız)",1]];tg.forEach(([s,sh])=>{(posBySec[s]=posBySec[s]||[]).push({tk:e.ticker,w:e.wEq*sh,r:e[perKey]});});});
+  const posSecs=Object.entries(posBySec).map(([s,arr])=>{arr.sort((a,b)=>b.w-a.w);const w=arr.reduce((a,x)=>a+x.w,0);let rn=0,rd=0;arr.forEach(x=>{if(x.r!=null){rn+=x.w*x.r;rd+=x.w;}});return{s,arr,w,r:rd?rn/rd:null};}).sort((a,b)=>b.w-a.w);
+  const posWmax=Math.max(...posSecs.flatMap(x=>x.arr.map(y=>y.w)),1);
+  const posCards=posSecs.map(sec=>{const chips=sec.arr.map(x=>`<div class="trp-row"><span class="trp-tk">${x.tk}</span><span class="trp-bar"><i style="width:${(x.w/posWmax*100).toFixed(0)}%"></i></span><span class="trp-wv">%${x.w.toFixed(1)}</span><span class="trp-rv">${trRet(x.r)}</span></div>`).join("");return `<div class="trp-card"><div class="trp-head"><span class="trp-name">${sec.s}</span><span class="trp-sw">%${sec.w.toFixed(1)}</span><span class="trp-sr">${trRet(sec.r)}</span></div><div class="trp-rows">${chips}</div></div>`;}).join("");
+  const perBtns=['d','w','m'].map(p=>`<button class="trp-pbtn${trFundPeriod===p?' on':''}" data-per="${p}">${p==='d'?'1G':p==='w'?'1H':'1A'}</button>`).join('');
   const uni=new Set(trAllStocks());
   const missing=d.equities.map(e=>e.ticker).filter(t=>!uni.has(t));
   const warn=missing.length?`<div class="trr-warn">⚠️ Raporda olup Yatırım Evreni'nde olmayan <b>${missing.length}</b> hisse: ${missing.join(", ")}<button class="tr-addsec" id="trAddMissing" style="margin-left:auto">+ Evrene ekle ve güncelle</button></div>`:"";
@@ -2867,10 +2880,10 @@ function renderTRFund(){
       <div class="trr-card"><div class="trr-h">🟢 En çok kazandıran <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(win)}</div>
       <div class="trr-card"><div class="trr-h">🔴 En çok kaybettiren <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(los)}</div>
     </div>
-    <div class="trr-card" style="margin-top:14px"><div class="trr-h">Hisse Pozisyonları <span class="trr-sub">(${d.equities.length})</span></div>
-      <div style="overflow:auto"><table class="trr-tbl"><thead><tr><th>Hisse</th><th class="r">Fon %</th><th class="r">Hisse %</th><th class="r">1G</th><th class="r">1H</th><th class="r">1A</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    <div class="trr-card" style="margin-top:14px"><div class="trr-h" style="display:flex;align-items:center">Hisse Pozisyonları <span class="trr-sub" style="margin-left:6px">(${d.equities.length} · sektöre göre)</span><span class="trp-per">${perBtns}</span></div><div class="trp-grid">${posCards}</div></div>`;
   const am=document.getElementById("trAddMissing");if(am)am.onclick=()=>{missing.forEach(t=>{if(!trAllStocks().includes(t))trCustomStocks.push(t);});saveTRStocks();flash(missing.length+" hisse Yatırım Evreni'ne eklendi");renderTRFund();};
   document.getElementById("trRecalc").onclick=()=>renderTRFund();
+  document.querySelectorAll("#trBody .trp-pbtn").forEach(b=>{b.onclick=()=>{trFundPeriod=b.dataset.per;renderTRFund();};});
 }
 document.getElementById("trBtn").onclick=openTR;
 document.getElementById("trTabUni").onclick=()=>trSetTab("uni");
