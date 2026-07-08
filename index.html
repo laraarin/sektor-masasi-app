@@ -776,22 +776,41 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .tru-unclassified .tru-chips{flex-direction:row;flex-wrap:wrap}
 .tru-uchip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border:1px dashed var(--line-cool);border-radius:5px;padding:3px 7px;cursor:pointer}
 .tru-uchip:hover{color:var(--accent);border-color:var(--accent)}
-.trp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-items:start}
-.trp-card{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
-.trp-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-.trp-name{font-weight:600;font-size:12px;color:var(--text);flex:1}
-.trp-sw{font-family:var(--mono);font-size:12px;color:var(--muted)}
-.trp-sr{font-family:var(--mono);font-size:12px;min-width:48px;text-align:right}
-.trp-rows{display:flex;flex-direction:column;gap:5px}
-.trp-row{display:grid;grid-template-columns:58px 1fr 40px 46px;align-items:center;gap:7px;font-size:11px}
+.trp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;align-items:start}
+.trp-card{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:11px 12px}
+.trp-ret{font-family:var(--mono);font-size:20px;font-weight:700;line-height:1}
+.trp-name{font-weight:600;font-size:12px;color:var(--text);margin-top:5px}
+.trp-subw{font-size:10px;color:var(--muted);margin-bottom:9px}
+.trp-rows{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:8px}
+.trp-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:11px}
 .trp-tk{font-family:var(--mono);font-weight:600;color:var(--text)}
-.trp-bar{height:6px;background:var(--ground);border-radius:3px;overflow:hidden}
-.trp-bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
-.trp-wv{font-family:var(--mono);color:var(--muted);text-align:right}
-.trp-rv{font-family:var(--mono);text-align:right}
+.trp-wv{font-family:var(--mono);color:var(--faint);font-size:10px}
+.trp-rv{font-family:var(--mono);text-align:right;min-width:44px}
 .trp-per{margin-left:auto;display:inline-flex;gap:3px}
 .trp-pbtn{background:transparent;border:1px solid var(--line-cool);color:var(--muted);border-radius:5px;padding:2px 9px;font-size:11px;cursor:pointer}
 .trp-pbtn.on{background:var(--accent);border-color:var(--accent);color:#1a1204;font-weight:600}
+.trh-row{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
+.trh-alloc{flex:1;min-width:280px}
+.trh-ret{flex:0 0 auto;min-width:210px}
+.tra-stack{display:flex;height:24px;border-radius:6px;overflow:hidden;background:var(--surface-2);margin-bottom:12px}
+.tra-seg{height:100%}
+.tra-seg+.tra-seg{border-left:2px solid var(--surface)}
+.tra-legend{display:flex;flex-wrap:wrap;gap:8px 16px}
+.tra-li{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text)}
+.tra-li .trr-sub{color:var(--faint)}
+.tra-dot{width:10px;height:10px;border-radius:2px;flex:0 0 auto}
+.trg{display:flex;gap:24px}
+.trg-i{display:flex;flex-direction:column;gap:3px}
+.trg-k{font-size:11px;color:var(--muted)}
+.trg-v{font-family:var(--mono);font-size:19px;font-weight:600}
+.trsb-chart{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px}
+.trsb-col{display:flex;flex-direction:column;align-items:center;min-width:46px;flex:1}
+.trsb-val{font-size:9px;font-family:var(--mono);height:12px;color:var(--muted)}
+.trsb-up{height:26px;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.trsb-dn{height:26px;width:100%;display:flex;align-items:flex-start;justify-content:center}
+.trsb-up i,.trsb-dn i{width:52%;border-radius:3px;display:block}
+.trsb-mid{height:1px;width:100%;background:var(--line)}
+.trsb-lbl{font-size:9px;color:var(--muted);margin-top:5px;text-align:center;line-height:1.15;max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trr-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:820px){.trr-grid{grid-template-columns:1fr}}
 .trr-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
@@ -828,7 +847,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s9</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s10</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -2835,17 +2854,15 @@ function renderTRFund(){
   const d=trRapors[trFund], body=document.getElementById("trBody"), meta=document.getElementById("trBarMeta");
   if(!d){meta.textContent="";body.innerHTML=`<div style="padding:48px;text-align:center;color:var(--muted)"><div style="font-size:16px;margin-bottom:10px">📄 ${trFund} Fon Raporu</div><div class="tr-hint" style="max-width:540px;margin:0 auto">Rapor verisi özel repodan gelir. Görmek için ABD tarafında sağ üstten <b>Token</b> gir. fon_database güncellenince rapor otomatik yenilenir.</div></div>`;return;}
   meta.textContent=`Fon: ${d.fund} · ${d.asOf} · ${trFmtMn(d.totalTl)}`;
-  const amax=Math.max(...d.assets.map(a=>a.pct),1);
-  const assetRows=d.assets.map(a=>`<div class="trr-bar"><div class="trr-bl">${a.name}</div><div class="trr-bt"><div class="trr-bf" style="width:${(a.pct/amax*100).toFixed(1)}%"></div></div><div class="trr-bv">%${a.pct.toFixed(1)} <span class="trr-sub">${trFmtMn(a.tl)}</span></div></div>`).join("");
+  const TRA_COLORS=['var(--accent)','#5b8fb0','#6f9e78','#b3708f','#9a8fb0','#c68a5a','#7ba7ad','#8a8a8a'];
+  const stackSegs=d.assets.map((a,i)=>`<div class="tra-seg" style="width:${a.pct}%;background:${TRA_COLORS[i%TRA_COLORS.length]}" title="${a.name} %${a.pct}"></div>`).join("");
+  const legend=d.assets.map((a,i)=>`<div class="tra-li"><span class="tra-dot" style="background:${TRA_COLORS[i%TRA_COLORS.length]}"></span>${a.name} <b>%${a.pct.toFixed(1)}</b> <span class="trr-sub">${trFmtMn(a.tl)}</span></div>`).join("");
   const er=d.eqReturns||{};
-  const retTiles=`<div class="trr-tiles"><div class="trr-tile"><div class="trr-tk">Günlük</div><div class="trr-tv">${trRet(er.d)}</div></div><div class="trr-tile"><div class="trr-tk">Haftalık</div><div class="trr-tv">${trRet(er.w)}</div></div><div class="trr-tile"><div class="trr-tk">Aylık</div><div class="trr-tv">${trRet(er.m)}</div></div></div>`;
+  const retStrip=`<div class="trg"><div class="trg-i"><span class="trg-k">Günlük</span><span class="trg-v">${trRet(er.d)}</span></div><div class="trg-i"><span class="trg-k">Haftalık</span><span class="trg-v">${trRet(er.w)}</span></div><div class="trg-i"><span class="trg-k">Aylık</span><span class="trg-v">${trRet(er.m)}</span></div></div>`;
   const bySec={};
   d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let tot=0;for(const s in m)tot+=(+m[s]||0);
     const tg=tot>0?Object.keys(m).map(s=>[s,(+m[s]||0)/tot]):[["(Sınıfsız)",1]];
     tg.forEach(([s,sh])=>{const w=e.wEq*sh;const o=bySec[s]||(bySec[s]={w:0,wn:0,wd:0});o.w+=w;if(e.ret1w!=null){o.wn+=w*e.ret1w;o.wd+=w;}});});
-  const secArr=Object.entries(bySec).map(([s,o])=>({s,w:o.w,r:o.wd?o.wn/o.wd:null})).sort((a,b)=>b.w-a.w);
-  const smax=Math.max(...secArr.map(x=>x.w),1);
-  const secRows=secArr.length?secArr.map(x=>`<div class="trr-bar${x.s.indexOf('Sınıfsız')>=0?' trr-unc':''}"><div class="trr-bl">${x.s}</div><div class="trr-bt"><div class="trr-bf" style="width:${(x.w/smax*100).toFixed(1)}%"></div></div><div class="trr-bv">%${x.w.toFixed(1)} ${trRet(x.r)}</div></div>`).join(""):`<div class="tr-hint">Sektör eşlemesi yok — Yatırım Evreni sekmesinde yüzdeleri gir.</div>`;
   const unc=(bySec["(Sınıfsız)"]||{}).w||0;
   const contrib=d.equities.filter(e=>e.ret1w!=null).map(e=>({t:e.ticker,c:e.wEq*e.ret1w/100})).sort((a,b)=>b.c-a.c);
   const win=contrib.filter(x=>x.c>0).slice(0,6), los=contrib.filter(x=>x.c<0).slice(-6).reverse();
@@ -2853,9 +2870,10 @@ function renderTRFund(){
   const PER={d:'ret1d',w:'ret1w',m:'ret1m'}, perKey=PER[trFundPeriod]||'ret1w';
   const posBySec={};
   d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let t=0;for(const k in m)t+=(+m[k]||0);const tg=t>0?Object.keys(m).map(k=>[k,(+m[k]||0)/t]):[["(Sınıfsız)",1]];tg.forEach(([s,sh])=>{(posBySec[s]=posBySec[s]||[]).push({tk:e.ticker,w:e.wEq*sh,r:e[perKey]});});});
-  const posSecs=Object.entries(posBySec).map(([s,arr])=>{arr.sort((a,b)=>b.w-a.w);const w=arr.reduce((a,x)=>a+x.w,0);let rn=0,rd=0;arr.forEach(x=>{if(x.r!=null){rn+=x.w*x.r;rd+=x.w;}});return{s,arr,w,r:rd?rn/rd:null};}).sort((a,b)=>b.w-a.w);
-  const posWmax=Math.max(...posSecs.flatMap(x=>x.arr.map(y=>y.w)),1);
-  const posCards=posSecs.map(sec=>{const chips=sec.arr.map(x=>`<div class="trp-row"><span class="trp-tk">${x.tk}</span><span class="trp-bar"><i style="width:${(x.w/posWmax*100).toFixed(0)}%"></i></span><span class="trp-wv">%${x.w.toFixed(1)}</span><span class="trp-rv">${trRet(x.r)}</span></div>`).join("");return `<div class="trp-card"><div class="trp-head"><span class="trp-name">${sec.s}</span><span class="trp-sw">%${sec.w.toFixed(1)}</span><span class="trp-sr">${trRet(sec.r)}</span></div><div class="trp-rows">${chips}</div></div>`;}).join("");
+  const posSecs=Object.entries(posBySec).map(([s,arr])=>{arr.sort((a,b)=>b.w-a.w);const w=arr.reduce((a,x)=>a+x.w,0);let rn=0,rd=0;arr.forEach(x=>{if(x.r!=null){rn+=x.w*x.r;rd+=x.w;}});return{s,arr,w,r:rd?rn/rd:null};}).sort((a,b)=>(b.r==null?-1e9:b.r)-(a.r==null?-1e9:a.r));
+  const rmax=Math.max(...posSecs.map(x=>Math.abs(x.r||0)),1);
+  const chart=posSecs.map(sec=>{const r=sec.r,up=r!=null&&r>=0,h=r!=null?Math.abs(r)/rmax*100:0;return `<div class="trsb-col" title="${sec.s} · %${sec.w.toFixed(1)} ağırlık"><div class="trsb-val ${r>0?'trr-up':(r<0?'trr-dn':'')}">${r!=null?(r>0?'+':'')+r.toFixed(0):''}</div><div class="trsb-up"><i style="height:${up?h.toFixed(0):0}%;background:var(--good)"></i></div><div class="trsb-mid"></div><div class="trsb-dn"><i style="height:${(!up&&r!=null)?h.toFixed(0):0}%;background:var(--bad)"></i></div><div class="trsb-lbl">${sec.s}</div></div>`;}).join("");
+  const posCards=posSecs.map(sec=>{const chips=sec.arr.map(x=>`<div class="trp-row"><span class="trp-tk">${x.tk}</span><span class="trp-wv">%${x.w.toFixed(1)}</span><span class="trp-rv">${trRet(x.r)}</span></div>`).join("");return `<div class="trp-card"><div class="trp-ret">${trRet(sec.r)}</div><div class="trp-name">${sec.s}</div><div class="trp-subw">%${sec.w.toFixed(1)} ağırlık · ${sec.arr.length} hisse</div><div class="trp-rows">${chips}</div></div>`;}).join("");
   const perBtns=['d','w','m'].map(p=>`<button class="trp-pbtn${trFundPeriod===p?' on':''}" data-per="${p}">${p==='d'?'1G':p==='w'?'1H':'1A'}</button>`).join('');
   const uni=new Set(trAllStocks());
   const missing=d.equities.map(e=>e.ticker).filter(t=>!uni.has(t));
@@ -2870,17 +2888,18 @@ function renderTRFund(){
       <div style="overflow:auto;margin-top:12px"><table class="trr-tbl"><thead><tr><th>ISIN</th><th>İhraççı</th><th>Tür</th><th>Getiri</th><th class="r">Vade (g)</th><th class="r">mn ₺</th><th class="r">Fon %</th></tr></thead><tbody>${bTbl}</tbody></table></div></div>`;
   }
   body.innerHTML=`${warn}<div class="trr-tools"><button class="tr-addsec" id="trRecalc">🔄 Yeniden hesapla</button></div>
-    <div class="trr-grid">
-      <div class="trr-card"><div class="trr-h">Varlık Dağılımı</div>${assetRows}</div>
-      <div class="trr-card"><div class="trr-h">Hisse Portföyü Getirisi <span class="trr-sub">(piyasa · ağırlıklı)</span></div>${retTiles}<div class="tr-hint" style="margin-top:10px">yfinance kapanış fiyatlarından, hisse ağırlıklarıyla. VİOP/temettü hariç, yaklaşık.</div></div>
-    </div>
-    <div class="trr-card" style="margin-top:14px"><div class="trr-h">Sektörel Dağılım <span class="trr-sub">(hisse portföyü · kişisel eşleme${unc>0?` · sınıfsız %${unc.toFixed(1)}`:''})</span></div>${secRows}</div>
+    <div class="trr-card"><div class="trh-row">
+      <div class="trh-alloc"><div class="trr-h">Varlık Dağılımı</div><div class="tra-stack">${stackSegs}</div><div class="tra-legend">${legend}</div></div>
+      <div class="trh-ret"><div class="trr-h">Hisse Getirisi <span class="trr-sub">(piyasa · ağırlıklı)</span></div>${retStrip}</div>
+    </div></div>
     ${bondHtml}
+    <div class="trr-card" style="margin-top:14px"><div class="trr-h" style="display:flex;align-items:center">Sektör Bazında <span class="trr-sub" style="margin-left:6px">(${d.equities.length} hisse${unc>0?` · sınıfsız %${unc.toFixed(1)}`:''})</span><span class="trp-per">${perBtns}</span></div>
+      <div class="trsb-chart">${chart}</div>
+      <div class="trp-grid">${posCards}</div></div>
     <div class="trr-grid" style="margin-top:14px">
       <div class="trr-card"><div class="trr-h">🟢 En çok kazandıran <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(win)}</div>
       <div class="trr-card"><div class="trr-h">🔴 En çok kaybettiren <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(los)}</div>
-    </div>
-    <div class="trr-card" style="margin-top:14px"><div class="trr-h" style="display:flex;align-items:center">Hisse Pozisyonları <span class="trr-sub" style="margin-left:6px">(${d.equities.length} · sektöre göre)</span><span class="trp-per">${perBtns}</span></div><div class="trp-grid">${posCards}</div></div>`;
+    </div>`;
   const am=document.getElementById("trAddMissing");if(am)am.onclick=()=>{missing.forEach(t=>{if(!trAllStocks().includes(t))trCustomStocks.push(t);});saveTRStocks();flash(missing.length+" hisse Yatırım Evreni'ne eklendi");renderTRFund();};
   document.getElementById("trRecalc").onclick=()=>renderTRFund();
   document.querySelectorAll("#trBody .trp-pbtn").forEach(b=>{b.onclick=()=>{trFundPeriod=b.dataset.per;renderTRFund();};});
