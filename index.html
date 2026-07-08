@@ -734,6 +734,7 @@
 .tr-tabs{display:flex;gap:6px;flex:0 0 auto}
 .tr-tab{background:transparent;border:1px solid var(--line-cool);color:var(--muted);border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;white-space:nowrap}
 .tr-tab.active{background:var(--accent);border-color:var(--accent);color:#1a1204;font-weight:600}
+.tr-fundsel{background:var(--surface-2);border:1px solid var(--line-cool);color:var(--text);border-radius:7px;padding:6px 10px;font-size:13px;font-family:var(--mono);font-weight:600;cursor:pointer;outline:none}
 .tr-body{flex:1;overflow:auto;padding:14px 16px}
 .tr-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .tr-toolbar .tr-filter{width:220px;background:var(--surface);border:1px solid var(--line-cool);color:var(--text);border-radius:6px;padding:7px 10px;font-size:13px;outline:none}
@@ -792,8 +793,9 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
     <span class="tr-title">🇹🇷 TR Terminal</span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
-      <button class="tr-tab" id="trTabFund">BV1</button>
+      <button class="tr-tab" id="trTabFund">Fon Raporu</button>
     </div>
+    <select id="trFundSel" class="tr-fundsel" title="Fon seç"><option value="BV1">BV1</option><option value="BVD">BVD</option></select>
     <div id="trBarMeta" class="tr-hint"></div>
     <button class="btn ghost sm" data-close="tr" title="ABD tarafına dön" style="margin-left:auto">✕ ABD'ye dön</button>
   </div>
@@ -893,7 +895,7 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json",akisFile:"sektor_akis.json",bv1RaporFile:"bv1-rapor.json"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json",akisFile:"sektor_akis.json",raporFiles:{BV1:"bv1-rapor.json",BVD:"bvd-rapor.json"}};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
@@ -903,7 +905,7 @@ let regimeChartUrl=null, regimeChartCommit=null;  // rejim_spx.png (rozete tıkl
 let fonData=null, fonCommit=null, fonFund="ALL";  // fon_portfoy.json (BVV/BTK pozisyonları, fon-portfoy-uret.py üretir)
 let taramaData=null, taramaCommit=null;  // sektor-tarama.json (haftalık sektör rotasyon taraması, Actions Çar & Cum üretir)
 let akisData=null, akisCommit=null, akisWin="1h";  // sektor_akis.json (ETF fon akışı, fon-akis-uret.py üretir)
-let trRaporData=null, trRaporCommit=null;  // bv1-rapor.json (TR fon raporu, fon-rapor-uret.py üretir)
+let trRapors={}, trRaporCommits={};  // fon kodu -> rapor json (fon-rapor-uret.py üretir)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -995,11 +997,15 @@ async function ghLoadAkis(){
   akisCommit=await ghLatestCommit(GH.akisFile);
 }
 async function ghLoadTRRapor(){
-  const r=await ghApi("/contents/"+GH.bv1RaporFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
-  if(!r.ok)return;
-  const txt=await r.text();
-  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.assets)trRaporData=d;}
-  trRaporCommit=await ghLatestCommit(GH.bv1RaporFile);
+  for(const f in GH.raporFiles){
+    try{
+      const r=await ghApi("/contents/"+GH.raporFiles[f]+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+      if(!r.ok)continue;
+      const txt=await r.text();
+      if(txt.trim()){const d=JSON.parse(txt);if(d&&d.assets)trRapors[f]=d;}
+      trRaporCommits[f]=await ghLatestCommit(GH.raporFiles[f]);
+    }catch(e){}
+  }
 }
 async function ghLoadRegimeChart(){
   const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
@@ -1054,8 +1060,7 @@ function startGitPoll(){
       if(tc&&tc!==taramaCommit){await ghLoadTarama();if(!document.getElementById("taramaModal").hidden)renderTarama();flash("Sektör taraması güncellendi");}
       const ac=await ghLatestCommit(GH.akisFile);
       if(ac&&ac!==akisCommit){await ghLoadAkis();if(!document.getElementById("akisModal").hidden)renderAkis();flash("Fon akışı güncellendi");}
-      const trc=await ghLatestCommit(GH.bv1RaporFile);
-      if(trc&&trc!==trRaporCommit){await ghLoadTRRapor();if(!document.getElementById("trSheet").hidden&&trTab==="fund")renderTRFund();flash("BV1 raporu güncellendi");}
+      for(const f in GH.raporFiles){const c=await ghLatestCommit(GH.raporFiles[f]);if(c&&c!==trRaporCommits[f]){await ghLoadTRRapor();if(!document.getElementById("trSheet").hidden&&trTab==="fund")renderTRFund();flash(f+" raporu güncellendi");break;}}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -2708,16 +2713,20 @@ const TR_SECTORS_DEFAULT=["Banka","Holding","GYO / İnşaat","Petrol","Madencile
 let trFund="BV1", trTab="uni", trSectors, trMap;
 try{trSectors=JSON.parse(localStorage.getItem("sm-tr-sectors")||"null")||TR_SECTORS_DEFAULT.slice();}catch(e){trSectors=TR_SECTORS_DEFAULT.slice();}
 try{trMap=JSON.parse(localStorage.getItem("sm-tr-map")||"null");}catch(e){trMap=null;}
-if(!trMap){trMap={};trMap[trFund]={};TR_STOCKS.forEach(tk=>{const m={};if(TR_PREFILL[tk])m[TR_PREFILL[tk]]=100;trMap[trFund][tk]=m;});saveTRMap();}
+// Eski fon-bazlı format {BV1:{ticker:{}}} -> global {ticker:{sektör:%}} taşıma (sektör fondan bağımsız)
+if(trMap&&trMap.BV1&&typeof trMap.BV1==="object"&&!Array.isArray(trMap.BV1)){
+  const flat={};Object.keys(trMap).forEach(f=>{const fm=trMap[f];if(fm&&typeof fm==="object")Object.keys(fm).forEach(tk=>{if(!flat[tk])flat[tk]=fm[tk];});});trMap=flat;saveTRMap();
+}
+if(!trMap){trMap={};TR_STOCKS.forEach(tk=>{const m={};if(TR_PREFILL[tk])m[TR_PREFILL[tk]]=100;trMap[tk]=m;});saveTRMap();}
 let trCustomStocks=[];
 try{trCustomStocks=JSON.parse(localStorage.getItem("sm-tr-stocks")||"[]")||[];}catch(e){trCustomStocks=[];}
 function saveTRStocks(){try{localStorage.setItem("sm-tr-stocks",JSON.stringify(trCustomStocks));}catch(e){}}
 function trAllStocks(){return Array.from(new Set(TR_STOCKS.concat(trCustomStocks))).sort();}
 function saveTRMap(){try{localStorage.setItem("sm-tr-map",JSON.stringify(trMap));}catch(e){}}
 function saveTRSectors(){try{localStorage.setItem("sm-tr-sectors",JSON.stringify(trSectors));}catch(e){}}
-function trCell(tk,sec){const f=trMap[trFund]||{};const m=f[tk]||{};return m[sec]||0;}
-function trSetCell(tk,sec,v){trMap[trFund]=trMap[trFund]||{};trMap[trFund][tk]=trMap[trFund][tk]||{};if(v)trMap[trFund][tk][sec]=v;else delete trMap[trFund][tk][sec];saveTRMap();}
-function trRowTotal(tk){const m=(trMap[trFund]||{})[tk]||{};return Object.values(m).reduce((a,b)=>a+(Number(b)||0),0);}
+function trCell(tk,sec){const m=trMap[tk]||{};return m[sec]||0;}
+function trSetCell(tk,sec,v){trMap[tk]=trMap[tk]||{};if(v)trMap[tk][sec]=v;else delete trMap[tk][sec];saveTRMap();}
+function trRowTotal(tk){const m=trMap[tk]||{};return Object.values(m).reduce((a,b)=>a+(Number(b)||0),0);}
 const TR_PASS="BV888";
 function trUnlocked(){try{return sessionStorage.getItem("sm-tr-unlock")==="1";}catch(e){return false;}}
 function trShowContent(){document.getElementById("trLock").hidden=true;document.getElementById("trBody").hidden=false;renderTR();}
@@ -2769,15 +2778,15 @@ function trRet(v){if(v==null)return '<span class="trr-na">–</span>';const c=v>
 function trPts(v){const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(2)} p</span>`;}
 function trFmtMn(v){return (v/1e6).toFixed(1).replace('.',',')+" mn ₺";}
 function renderTRFund(){
-  const d=trRaporData, body=document.getElementById("trBody"), meta=document.getElementById("trBarMeta");
-  if(!d){meta.textContent="";body.innerHTML=`<div style="padding:48px;text-align:center;color:var(--muted)"><div style="font-size:16px;margin-bottom:10px">📄 BV1 Fon Raporu</div><div class="tr-hint" style="max-width:540px;margin:0 auto">Rapor verisi <code>bv1-rapor.json</code>'dan gelir (özel repo). Görmek için ABD tarafında sağ üstten <b>Token</b> gir. fon_database güncellenince rapor otomatik yenilenir.</div></div>`;return;}
+  const d=trRapors[trFund], body=document.getElementById("trBody"), meta=document.getElementById("trBarMeta");
+  if(!d){meta.textContent="";body.innerHTML=`<div style="padding:48px;text-align:center;color:var(--muted)"><div style="font-size:16px;margin-bottom:10px">📄 ${trFund} Fon Raporu</div><div class="tr-hint" style="max-width:540px;margin:0 auto">Rapor verisi özel repodan gelir. Görmek için ABD tarafında sağ üstten <b>Token</b> gir. fon_database güncellenince rapor otomatik yenilenir.</div></div>`;return;}
   meta.textContent=`Fon: ${d.fund} · ${d.asOf} · ${trFmtMn(d.totalTl)}`;
   const amax=Math.max(...d.assets.map(a=>a.pct),1);
   const assetRows=d.assets.map(a=>`<div class="trr-bar"><div class="trr-bl">${a.name}</div><div class="trr-bt"><div class="trr-bf" style="width:${(a.pct/amax*100).toFixed(1)}%"></div></div><div class="trr-bv">%${a.pct.toFixed(1)} <span class="trr-sub">${trFmtMn(a.tl)}</span></div></div>`).join("");
   const er=d.eqReturns||{};
   const retTiles=`<div class="trr-tiles"><div class="trr-tile"><div class="trr-tk">Günlük</div><div class="trr-tv">${trRet(er.d)}</div></div><div class="trr-tile"><div class="trr-tk">Haftalık</div><div class="trr-tv">${trRet(er.w)}</div></div><div class="trr-tile"><div class="trr-tk">Aylık</div><div class="trr-tv">${trRet(er.m)}</div></div></div>`;
-  const secMap=trMap[trFund]||{}; const bySec={};
-  d.equities.forEach(e=>{const m=secMap[e.ticker]||{};let tot=0;for(const s in m)tot+=(+m[s]||0);
+  const bySec={};
+  d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let tot=0;for(const s in m)tot+=(+m[s]||0);
     const tg=tot>0?Object.keys(m).map(s=>[s,(+m[s]||0)/tot]):[["(Sınıfsız)",1]];
     tg.forEach(([s,sh])=>{const w=e.wEq*sh;const o=bySec[s]||(bySec[s]={w:0,wn:0,wd:0});o.w+=w;if(e.ret1w!=null){o.wn+=w*e.ret1w;o.wd+=w;}});});
   const secArr=Object.entries(bySec).map(([s,o])=>({s,w:o.w,r:o.wd?o.wn/o.wd:null})).sort((a,b)=>b.w-a.w);
@@ -2809,6 +2818,7 @@ function renderTRFund(){
 document.getElementById("trBtn").onclick=openTR;
 document.getElementById("trTabUni").onclick=()=>trSetTab("uni");
 document.getElementById("trTabFund").onclick=()=>trSetTab("fund");
+document.getElementById("trFundSel").onchange=(e)=>{trFund=e.target.value;if(trTab==="fund")renderTRFund();};
 document.getElementById("trPassGo").onclick=tryTRPass;
 document.getElementById("trPass").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryTRPass();}});
 document.getElementById("newsBtn").onclick=()=>openNews("");
