@@ -648,6 +648,7 @@
   </div>
   <div class="riskbadge" id="riskBadge" hidden></div>
   <div class="tools">
+    <button class="btn primary" id="trBtn" title="TR Fon Panosu — sektörel ağırlıklar">🇹🇷 TR</button>
     <div class="search"><span>⌕</span><input id="search" type="text" placeholder="Ticker veya sektör ara" aria-label="Ara" /></div>
     <button class="btn primary" id="newsBtn" title="Haber akışı">📰 Haberler</button>
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
@@ -722,6 +723,33 @@
     <button class="modal-x" data-close="akis" title="Kapat">✕</button>
     <div class="sheet-head"><h3>💧 Fon Akışı — Sektöre Giriş / Çıkış</h3><div id="akisMeta" class="regime-meta"></div></div>
     <div class="sheet-body" id="akisBody"></div>
+  </div>
+</div>
+
+<style>
+#trBody .tr-wrap{display:flex;flex-direction:column;gap:10px;padding:4px 2px}
+#trBody .tr-row{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+#trBody .tr-row.tr-unc{opacity:.72;border-style:dashed}
+#trBody .tr-row-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+#trBody .tr-sec{font-weight:600;font-size:14px;color:var(--text)}
+#trBody .tr-cnt{display:inline-block;min-width:20px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border-radius:20px;padding:1px 7px;margin-left:6px}
+#trBody .tr-wbox{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+#trBody .tr-w{width:74px;background:var(--surface-2);border:1px solid var(--line-cool);color:var(--text);border-radius:6px;padding:6px 8px;font-family:var(--mono);font-size:14px;text-align:right;outline:none}
+#trBody .tr-w:focus{border-color:var(--accent-2)}
+#trBody .tr-pct{color:var(--muted);font-family:var(--mono)}
+#trBody .tr-chips{display:flex;flex-wrap:wrap;gap:5px}
+#trBody .tr-chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
+#trMeta .tr-ok b{color:var(--good)}
+#trMeta .tr-warn b{color:var(--accent)}
+#trMeta .tr-note{color:var(--faint);font-style:italic}
+</style>
+
+<div class="modal" id="trModal" hidden>
+  <div class="modal-bg" data-close="tr"></div>
+  <div class="modal-card big">
+    <button class="modal-x" data-close="tr" title="Kapat">✕</button>
+    <div class="sheet-head"><h3>🇹🇷 TR Fon Panosu</h3><div id="trMeta" class="regime-meta"></div></div>
+    <div class="sheet-body" id="trBody"></div>
   </div>
 </div>
 
@@ -2606,6 +2634,48 @@ function wireReportForm(){
     reportForm=null;render();flash("Rapor kaydedildi");
   };
 }
+/* ================= TR Fon Panosu ================= */
+const TR_SEED={fund:"BV1",note:"Başlangıç: Mapping 2. aşama Excel'inden. Sektörel ağırlıkları düzenleyebilirsin.",sectors:[
+  {name:"Banka",stocks:["AKBNK","ALBRK","GARAN","HALKB","ISCTR","SKBNK","TSKB","VAKBN","XLBNK","YKBNK"]},
+  {name:"Holding",stocks:["AGHOL","DOHOL","KCHOL","SAHOL"]},
+  {name:"GYO / İnşaat",stocks:["AKSGY","EKGYO","ENKAI","HLGYO","ISGYO","KLGYO","OZKGY","SNGYO","TRGYO","VKGYO"]},
+  {name:"Petrol",stocks:["AYGAZ","NTGAZ","PETKM","TUPRS"]},
+  {name:"Madenciler",stocks:["GUBRF","TRALT","TRMET"]},
+  {name:"Savunma",stocks:["ASELS","OTKAR"]},
+  {name:"Havacılık",stocks:["PGSUS","TAVHL","THYAO"]},
+  {name:"(Sınıfsız)",stocks:["AEFES","AFYON","AKCNS","AKFYE","AKGRT","AKHAN","AKSEN","ALARK","ALTNY","ALVES","ANSGR","ARASE","ARCLK","ARDYZ","ARENA","ASGYO","ASTOR","ATATR","AZTEK","BALSU","BANVT","BESLR","BIGEN","BIMAS","BORSK","BRSAN","CCOLA","CIMSA","CLEBI","DMLKT","DMLKTG","DOAS","DSTKF","DZGYO","EBEBK","ECILC","EMPAE","ENJSA","EREGL","ESCOM","FENER","FROTO","GEDZA","GENTS","GESAN","GLCVY","GLRMK","GOKNR","GOZDE","GSRAY","GWIND","HEDEF","HEKTS","HOROZ","HUBVC","INDES","INFO","ISMEN","KAREL","KATMR","KCAER","KERVT","KIMMR","KONTR","KOZAA","KOZAL","KRDMD","KRONT","KRVGD","KTLEV","LILAK","LMKDC","LOGO","MACKO","MAKIM","MAVI","MERKO","MGROS","MOGAN","MPARK","NETCD","ODINE","OFSYM","ORGE","OYAKC","OZATD","OZGYO","PENTA","PSGYO","REEDR","SASA","SISE","SOKM","SUWEN","TABGD","TATEN","TCELL","TERA","TKFEN","TOASO","TSPOR","TTKOM","TURSG","ULKER","VAKKO","VESTL"]}
+]};
+let trFund="BV1";
+let trWeights={};
+try{trWeights=JSON.parse(localStorage.getItem("sm-tr-weights")||"{}")||{};}catch(e){trWeights={};}
+function saveTRWeights(){try{localStorage.setItem("sm-tr-weights",JSON.stringify(trWeights));}catch(e){}}
+function trW(sec){const f=trWeights[trFund];return (f&&f[sec]!=null)?f[sec]:0;}
+function trSetW(sec,val){(trWeights[trFund]=trWeights[trFund]||{})[sec]=val;saveTRWeights();}
+function openTR(){document.getElementById("trModal").hidden=false;renderTR();}
+function closeTR(){document.getElementById("trModal").hidden=true;}
+function renderTR(){
+  const data=TR_SEED;
+  const total=data.sectors.reduce((a,s)=>a+(Number(trW(s.name))||0),0);
+  const totCls=Math.abs(total-100)<0.05?"tr-ok":"tr-warn";
+  let rows="";
+  data.sectors.forEach(s=>{
+    const w=trW(s.name), unc=s.name.indexOf("Sınıfsız")>=0;
+    const chips=s.stocks.map(t=>`<span class="tr-chip">${t}</span>`).join("");
+    rows+=`<div class="tr-row${unc?" tr-unc":""}">
+      <div class="tr-row-head">
+        <div class="tr-sec">${s.name} <span class="tr-cnt">${s.stocks.length}</span></div>
+        <div class="tr-wbox"><input type="number" class="tr-w" data-sec="${s.name}" value="${w}" min="0" max="100" step="0.5"${unc?' title="Sınıfsız — henüz sektör atanmamış"':''}> <span class="tr-pct">%</span></div>
+      </div>
+      <div class="tr-chips">${chips}</div>
+    </div>`;
+  });
+  document.getElementById("trMeta").innerHTML=`<span>Fon: <b>${data.fund}</b></span> · <span class="${totCls}">Toplam ağırlık: <b>${total.toFixed(1)}%</b></span> · <span class="tr-note">${data.note}</span>`;
+  document.getElementById("trBody").innerHTML=`<div class="tr-wrap">${rows}</div>`;
+  document.querySelectorAll("#trBody .tr-w").forEach(inp=>{
+    inp.onchange=()=>{let v=parseFloat(inp.value);if(isNaN(v)||v<0)v=0;trSetW(inp.dataset.sec,v);renderTR();};
+  });
+}
+document.getElementById("trBtn").onclick=openTR;
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("fonBtn").onclick=openFon;
@@ -2635,8 +2705,9 @@ document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeR
 document.querySelectorAll('[data-close="fon"]').forEach(el=>el.onclick=closeFon);
 document.querySelectorAll('[data-close="tarama"]').forEach(el=>el.onclick=closeTarama);
 document.querySelectorAll('[data-close="akis"]').forEach(el=>el.onclick=closeAkis);
+document.querySelectorAll('[data-close="tr"]').forEach(el=>el.onclick=closeTR);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
-document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();else if(!document.getElementById("trModal").hidden)closeTR();});
 
 /* ---------- startup ---------- */
 async function init(){
