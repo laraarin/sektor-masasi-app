@@ -727,30 +727,45 @@
 </div>
 
 <style>
-#trBody .tr-wrap{display:flex;flex-direction:column;gap:10px;padding:4px 2px}
-#trBody .tr-row{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-#trBody .tr-row.tr-unc{opacity:.72;border-style:dashed}
-#trBody .tr-row-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
-#trBody .tr-sec{font-weight:600;font-size:14px;color:var(--text)}
-#trBody .tr-cnt{display:inline-block;min-width:20px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border-radius:20px;padding:1px 7px;margin-left:6px}
-#trBody .tr-wbox{display:flex;align-items:center;gap:4px;flex:0 0 auto}
-#trBody .tr-w{width:74px;background:var(--surface-2);border:1px solid var(--line-cool);color:var(--text);border-radius:6px;padding:6px 8px;font-family:var(--mono);font-size:14px;text-align:right;outline:none}
-#trBody .tr-w:focus{border-color:var(--accent-2)}
-#trBody .tr-pct{color:var(--muted);font-family:var(--mono)}
-#trBody .tr-chips{display:flex;flex-wrap:wrap;gap:5px}
-#trBody .tr-chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
-#trMeta .tr-ok b{color:var(--good)}
-#trMeta .tr-warn b{color:var(--accent)}
-#trMeta .tr-note{color:var(--faint);font-style:italic}
+.tr-sheet{position:fixed;inset:0;z-index:86;background:var(--ground);display:flex;flex-direction:column}
+.tr-sheet[hidden]{display:none}
+.tr-bar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface);width:100%;min-height:54px;flex:0 0 auto;box-sizing:border-box}
+.tr-bar .tr-title{font-weight:700;font-size:15px;color:var(--text);white-space:nowrap}
+.tr-tabs{display:flex;gap:6px;flex:0 0 auto}
+.tr-tab{background:transparent;border:1px solid var(--line-cool);color:var(--muted);border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;white-space:nowrap}
+.tr-tab.active{background:var(--accent);border-color:var(--accent);color:#1a1204;font-weight:600}
+.tr-body{flex:1;overflow:auto;padding:14px 16px}
+.tr-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.tr-toolbar .tr-filter{width:220px;background:var(--surface);border:1px solid var(--line-cool);color:var(--text);border-radius:6px;padding:7px 10px;font-size:13px;outline:none}
+.tr-hint{color:var(--faint);font-size:12px}
+.trm-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:calc(100vh - 170px)}
+table.trm{border-collapse:separate;border-spacing:0;font-size:12px}
+table.trm th,table.trm td{padding:4px 6px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+table.trm thead th{position:sticky;top:0;z-index:3;background:var(--surface-2);color:var(--muted);font-weight:600}
+table.trm thead th.trm-sec{writing-mode:vertical-rl;transform:rotate(180deg);height:130px;vertical-align:bottom;text-align:left;font-weight:500;font-size:11px}
+table.trm td.trm-tk,table.trm th.trm-tk{position:sticky;left:0;z-index:2;background:var(--surface);font-family:var(--mono);font-weight:600;color:var(--text);text-align:left}
+table.trm thead th.trm-tk{z-index:4}
+table.trm td.trm-tot,table.trm th.trm-tot{position:sticky;right:0;background:var(--surface);font-family:var(--mono);text-align:right;font-weight:600;min-width:34px}
+table.trm thead th.trm-tot{z-index:4}
+.trm-c{width:44px;background:transparent;border:none;color:var(--text);font-family:var(--mono);font-size:12px;text-align:center;outline:none;padding:2px}
+.trm-c:focus{background:var(--surface-2);outline:1px solid var(--accent-2);border-radius:3px}
+.trm-c.z{color:var(--faint)}
+table.trm tr.trm-empty td.trm-tot{color:var(--accent)}
+table.trm tr.trm-full td.trm-tot{color:var(--good)}
+.tr-addsec{background:transparent;border:1px dashed var(--line-cool);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer}
 </style>
 
-<div class="modal" id="trModal" hidden>
-  <div class="modal-bg" data-close="tr"></div>
-  <div class="modal-card big">
-    <button class="modal-x" data-close="tr" title="Kapat">✕</button>
-    <div class="sheet-head"><h3>🇹🇷 TR Fon Panosu</h3><div id="trMeta" class="regime-meta"></div></div>
-    <div class="sheet-body" id="trBody"></div>
+<div class="tr-sheet" id="trSheet" hidden>
+  <div class="tr-bar">
+    <span class="tr-title">🇹🇷 TR Terminal</span>
+    <div class="tr-tabs">
+      <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
+      <button class="tr-tab" id="trTabFund">BV1</button>
+    </div>
+    <div id="trBarMeta" class="tr-hint"></div>
+    <button class="btn ghost sm" data-close="tr" title="ABD tarafına dön" style="margin-left:auto">✕ ABD'ye dön</button>
   </div>
+  <div class="tr-body" id="trBody"></div>
 </div>
 
 <div class="fon-sheet" id="fonModal" hidden>
@@ -2634,48 +2649,59 @@ function wireReportForm(){
     reportForm=null;render();flash("Rapor kaydedildi");
   };
 }
-/* ================= TR Fon Panosu ================= */
-const TR_SEED={fund:"BV1",note:"Başlangıç: Mapping 2. aşama Excel'inden. Sektörel ağırlıkları düzenleyebilirsin.",sectors:[
-  {name:"Banka",stocks:["AKBNK","ALBRK","GARAN","HALKB","ISCTR","SKBNK","TSKB","VAKBN","XLBNK","YKBNK"]},
-  {name:"Holding",stocks:["AGHOL","DOHOL","KCHOL","SAHOL"]},
-  {name:"GYO / İnşaat",stocks:["AKSGY","EKGYO","ENKAI","HLGYO","ISGYO","KLGYO","OZKGY","SNGYO","TRGYO","VKGYO"]},
-  {name:"Petrol",stocks:["AYGAZ","NTGAZ","PETKM","TUPRS"]},
-  {name:"Madenciler",stocks:["GUBRF","TRALT","TRMET"]},
-  {name:"Savunma",stocks:["ASELS","OTKAR"]},
-  {name:"Havacılık",stocks:["PGSUS","TAVHL","THYAO"]},
-  {name:"(Sınıfsız)",stocks:["AEFES","AFYON","AKCNS","AKFYE","AKGRT","AKHAN","AKSEN","ALARK","ALTNY","ALVES","ANSGR","ARASE","ARCLK","ARDYZ","ARENA","ASGYO","ASTOR","ATATR","AZTEK","BALSU","BANVT","BESLR","BIGEN","BIMAS","BORSK","BRSAN","CCOLA","CIMSA","CLEBI","DMLKT","DMLKTG","DOAS","DSTKF","DZGYO","EBEBK","ECILC","EMPAE","ENJSA","EREGL","ESCOM","FENER","FROTO","GEDZA","GENTS","GESAN","GLCVY","GLRMK","GOKNR","GOZDE","GSRAY","GWIND","HEDEF","HEKTS","HOROZ","HUBVC","INDES","INFO","ISMEN","KAREL","KATMR","KCAER","KERVT","KIMMR","KONTR","KOZAA","KOZAL","KRDMD","KRONT","KRVGD","KTLEV","LILAK","LMKDC","LOGO","MACKO","MAKIM","MAVI","MERKO","MGROS","MOGAN","MPARK","NETCD","ODINE","OFSYM","ORGE","OYAKC","OZATD","OZGYO","PENTA","PSGYO","REEDR","SASA","SISE","SOKM","SUWEN","TABGD","TATEN","TCELL","TERA","TKFEN","TOASO","TSPOR","TTKOM","TURSG","ULKER","VAKKO","VESTL"]}
-]};
-let trFund="BV1";
-let trWeights={};
-try{trWeights=JSON.parse(localStorage.getItem("sm-tr-weights")||"{}")||{};}catch(e){trWeights={};}
-function saveTRWeights(){try{localStorage.setItem("sm-tr-weights",JSON.stringify(trWeights));}catch(e){}}
-function trW(sec){const f=trWeights[trFund];return (f&&f[sec]!=null)?f[sec]:0;}
-function trSetW(sec,val){(trWeights[trFund]=trWeights[trFund]||{})[sec]=val;saveTRWeights();}
-function openTR(){document.getElementById("trModal").hidden=false;renderTR();}
-function closeTR(){document.getElementById("trModal").hidden=true;}
-function renderTR(){
-  const data=TR_SEED;
-  const total=data.sectors.reduce((a,s)=>a+(Number(trW(s.name))||0),0);
-  const totCls=Math.abs(total-100)<0.05?"tr-ok":"tr-warn";
-  let rows="";
-  data.sectors.forEach(s=>{
-    const w=trW(s.name), unc=s.name.indexOf("Sınıfsız")>=0;
-    const chips=s.stocks.map(t=>`<span class="tr-chip">${t}</span>`).join("");
-    rows+=`<div class="tr-row${unc?" tr-unc":""}">
-      <div class="tr-row-head">
-        <div class="tr-sec">${s.name} <span class="tr-cnt">${s.stocks.length}</span></div>
-        <div class="tr-wbox"><input type="number" class="tr-w" data-sec="${s.name}" value="${w}" min="0" max="100" step="0.5"${unc?' title="Sınıfsız — henüz sektör atanmamış"':''}> <span class="tr-pct">%</span></div>
-      </div>
-      <div class="tr-chips">${chips}</div>
-    </div>`;
+/* ================= TR Terminal ================= */
+const TR_STOCKS=["AEFES","AFYON","AGHOL","AKBNK","AKCNS","AKFYE","AKGRT","AKHAN","AKSEN","AKSGY","ALARK","ALBRK","ALTNY","ALVES","ANSGR","ARASE","ARCLK","ARDYZ","ARENA","ASELS","ASGYO","ASTOR","ATATR","AYGAZ","AZTEK","BALSU","BANVT","BESLR","BIGEN","BIMAS","BORSK","BRSAN","CCOLA","CIMSA","CLEBI","DMLKT","DMLKTG","DOAS","DOHOL","DSTKF","DZGYO","EBEBK","ECILC","EKGYO","EMPAE","ENJSA","ENKAI","EREGL","ESCOM","FENER","FROTO","GARAN","GEDZA","GENTS","GESAN","GLCVY","GLRMK","GOKNR","GOZDE","GSRAY","GUBRF","GWIND","HALKB","HEDEF","HEKTS","HLGYO","HOROZ","HUBVC","INDES","INFO","ISCTR","ISGYO","ISMEN","KAREL","KATMR","KCAER","KCHOL","KERVT","KIMMR","KLGYO","KONTR","KOZAA","KOZAL","KRDMD","KRONT","KRVGD","KTLEV","LILAK","LMKDC","LOGO","MACKO","MAKIM","MAVI","MERKO","MGROS","MOGAN","MPARK","NETCD","NTGAZ","ODINE","OFSYM","ORGE","OTKAR","OYAKC","OZATD","OZGYO","OZKGY","PENTA","PETKM","PGSUS","PSGYO","REEDR","SAHOL","SASA","SISE","SKBNK","SNGYO","SOKM","SUWEN","TABGD","TATEN","TAVHL","TCELL","TERA","THYAO","TKFEN","TOASO","TRALT","TRGYO","TRMET","TSKB","TSPOR","TTKOM","TUPRS","TURSG","ULKER","VAKBN","VAKKO","VESTL","VKGYO","XLBNK","YKBNK"];
+const TR_PREFILL={"AGHOL":"Holding","AKBNK":"Banka","AKSGY":"GYO / İnşaat","ALBRK":"Banka","ASELS":"Savunma","AYGAZ":"Petrol","DOHOL":"Holding","EKGYO":"GYO / İnşaat","ENKAI":"GYO / İnşaat","GARAN":"Banka","GUBRF":"Madenciler","HALKB":"Banka","HLGYO":"GYO / İnşaat","ISCTR":"Banka","ISGYO":"GYO / İnşaat","KCHOL":"Holding","KLGYO":"GYO / İnşaat","NTGAZ":"Petrol","OTKAR":"Savunma","OZKGY":"GYO / İnşaat","PETKM":"Petrol","PGSUS":"Havacılık","SAHOL":"Holding","SKBNK":"Banka","SNGYO":"GYO / İnşaat","TAVHL":"Havacılık","THYAO":"Havacılık","TRALT":"Madenciler","TRGYO":"GYO / İnşaat","TRMET":"Madenciler","TSKB":"Banka","TUPRS":"Petrol","VAKBN":"Banka","VKGYO":"GYO / İnşaat","XLBNK":"Banka","YKBNK":"Banka"};
+const TR_SECTORS_DEFAULT=["Banka","Holding","GYO / İnşaat","Petrol","Madenciler","Savunma","Havacılık","Sanayi","Teknoloji & Bilişim","Kimya","Demir-Çelik","Otomotiv","Perakende","Gıda & İçecek","Enerji & Elektrik","Telekom","Cam & Çimento","Sağlık","Sigorta & Finans","Turizm"];
+let trFund="BV1", trTab="uni", trSectors, trMap;
+try{trSectors=JSON.parse(localStorage.getItem("sm-tr-sectors")||"null")||TR_SECTORS_DEFAULT.slice();}catch(e){trSectors=TR_SECTORS_DEFAULT.slice();}
+try{trMap=JSON.parse(localStorage.getItem("sm-tr-map")||"null");}catch(e){trMap=null;}
+if(!trMap){trMap={};trMap[trFund]={};TR_STOCKS.forEach(tk=>{const m={};if(TR_PREFILL[tk])m[TR_PREFILL[tk]]=100;trMap[trFund][tk]=m;});saveTRMap();}
+function saveTRMap(){try{localStorage.setItem("sm-tr-map",JSON.stringify(trMap));}catch(e){}}
+function saveTRSectors(){try{localStorage.setItem("sm-tr-sectors",JSON.stringify(trSectors));}catch(e){}}
+function trCell(tk,sec){const f=trMap[trFund]||{};const m=f[tk]||{};return m[sec]||0;}
+function trSetCell(tk,sec,v){trMap[trFund]=trMap[trFund]||{};trMap[trFund][tk]=trMap[trFund][tk]||{};if(v)trMap[trFund][tk][sec]=v;else delete trMap[trFund][tk][sec];saveTRMap();}
+function trRowTotal(tk){const m=(trMap[trFund]||{})[tk]||{};return Object.values(m).reduce((a,b)=>a+(Number(b)||0),0);}
+function openTR(){document.getElementById("trSheet").hidden=false;renderTR();}
+function closeTR(){document.getElementById("trSheet").hidden=true;}
+function trSetTab(t){trTab=t;document.getElementById("trTabUni").classList.toggle("active",t==="uni");document.getElementById("trTabFund").classList.toggle("active",t==="fund");renderTR();}
+function renderTR(){if(trTab==="uni")renderTRUniverse();else renderTRFund();}
+function renderTRUniverse(){
+  const secs=trSectors;
+  const head=`<tr><th class="trm-tk">Hisse</th>`+secs.map(s=>`<th class="trm-sec" title="${s}">${s}</th>`).join("")+`<th class="trm-tot">Top</th></tr>`;
+  let body="";
+  TR_STOCKS.forEach(tk=>{
+    const tot=trRowTotal(tk);
+    const cls=tot===0?"trm-empty":(Math.abs(tot-100)<0.05?"trm-full":"");
+    body+=`<tr class="${cls}" data-row="${tk}"><td class="trm-tk">${tk}</td>`+
+      secs.map(s=>{const v=trCell(tk,s);return `<td><input class="trm-c${v?'':' z'}" data-tk="${tk}" data-sec="${s}" value="${v||''}" inputmode="numeric"></td>`;}).join("")+
+      `<td class="trm-tot" id="tot-${tk}">${tot||''}</td></tr>`;
   });
-  document.getElementById("trMeta").innerHTML=`<span>Fon: <b>${data.fund}</b></span> · <span class="${totCls}">Toplam ağırlık: <b>${total.toFixed(1)}%</b></span> · <span class="tr-note">${data.note}</span>`;
-  document.getElementById("trBody").innerHTML=`<div class="tr-wrap">${rows}</div>`;
-  document.querySelectorAll("#trBody .tr-w").forEach(inp=>{
-    inp.onchange=()=>{let v=parseFloat(inp.value);if(isNaN(v)||v<0)v=0;trSetW(inp.dataset.sec,v);renderTR();};
+  document.getElementById("trBody").innerHTML=`<div class="tr-toolbar">
+      <input class="tr-filter" id="trFilter" placeholder="Hisse ara (örn. SAHOL)">
+      <button class="tr-addsec" id="trAddSec">+ sektör (kolon) ekle</button>
+      <span class="tr-hint">Her hisse için sektör yüzdelerini gir · satır 100 → yeşil · boş → kırmızı · bir hisse birden çok sektöre bölünebilir</span>
+    </div>
+    <div class="trm-wrap"><table class="trm"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  document.getElementById("trBarMeta").textContent=`Fon: ${trFund} · ${TR_STOCKS.length} hisse · ${secs.length} sektör`;
+  document.querySelectorAll("#trBody .trm-c").forEach(inp=>{
+    inp.onchange=()=>{let v=parseFloat(inp.value);if(isNaN(v)||v<0)v=0;if(v>100)v=100;trSetCell(inp.dataset.tk,inp.dataset.sec,v);
+      inp.classList.toggle("z",!v);inp.value=v||'';
+      const tk=inp.dataset.tk,tot=trRowTotal(tk),tc=document.getElementById("tot-"+tk);if(tc)tc.textContent=tot||'';
+      const row=inp.closest("tr");row.classList.remove("trm-empty","trm-full");if(tot===0)row.classList.add("trm-empty");else if(Math.abs(tot-100)<0.05)row.classList.add("trm-full");};
   });
+  document.getElementById("trFilter").oninput=e=>{const q=e.target.value.trim().toUpperCase();document.querySelectorAll("#trBody tbody tr").forEach(row=>{row.style.display=(!q||row.dataset.row.indexOf(q)>=0)?"":"none";});};
+  document.getElementById("trAddSec").onclick=()=>{const n=prompt("Yeni sektör (kolon) adı:");if(n&&n.trim()&&!trSectors.includes(n.trim())){trSectors.push(n.trim());saveTRSectors();renderTRUniverse();}};
+}
+function renderTRFund(){
+  document.getElementById("trBarMeta").textContent="";
+  document.getElementById("trBody").innerHTML=`<div style="padding:48px;text-align:center;color:var(--muted)">
+    <div style="font-size:16px;margin-bottom:10px">📄 BV1 Fon Sayfası</div>
+    <div class="tr-hint" style="max-width:520px;margin:0 auto">Sıradaki adımda kuracağız: yatırım evrenindeki sektör yüzdeleri + fonun gerçek hisse ağırlıkları → sektörel dağılım raporu (fon raporlarındaki gibi).</div></div>`;
 }
 document.getElementById("trBtn").onclick=openTR;
+document.getElementById("trTabUni").onclick=()=>trSetTab("uni");
+document.getElementById("trTabFund").onclick=()=>trSetTab("fund");
 document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("fonBtn").onclick=openFon;
@@ -2707,7 +2733,7 @@ document.querySelectorAll('[data-close="tarama"]').forEach(el=>el.onclick=closeT
 document.querySelectorAll('[data-close="akis"]').forEach(el=>el.onclick=closeAkis);
 document.querySelectorAll('[data-close="tr"]').forEach(el=>el.onclick=closeTR);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
-document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();else if(!document.getElementById("trModal").hidden)closeTR();});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();else if(!document.getElementById("trSheet").hidden)closeTR();});
 
 /* ---------- startup ---------- */
 async function init(){
