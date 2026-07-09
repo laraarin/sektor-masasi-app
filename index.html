@@ -917,7 +917,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s21</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s22</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabRot">Rotasyon</button>
@@ -2977,6 +2977,7 @@ function renderTRUniverse(){
 }
 function trRet(v){if(v==null)return '<span class="trr-na">–</span>';const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(1)}%</span>`;}
 function trPts(v){const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(2)} p</span>`;}
+function trPts3(v){const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(3)} p</span>`;}
 function trFmtMn(v){return (v/1e6).toFixed(1).replace('.',',')+" mn ₺";}
 function trFbSec(e){return e.market==="ABD"?"ABD (Yabancı)":((e.market&&e.market!=="TR")?"Yabancı":"(Sınıfsız)");}
 function trhFmtCap(v){if(!v)return "—";if(v>=1e9)return (v/1e9).toFixed(1).replace('.',',')+" mr ₺";if(v>=1e6)return (v/1e6).toFixed(0)+" mn ₺";return Math.round(v).toLocaleString("tr-TR")+" ₺";}
@@ -3080,7 +3081,7 @@ function renderTRFund(){
     const clsRows=at.classes.map(c=>{
       const pos=c.c>=0,w=(Math.abs(c.c)/amax*100).toFixed(0);
       let sub="";
-      if(c.name==="Sabit Getiri"&&at.fixed&&at.fixed.length)sub=`<div class="attr-sub">`+at.fixed.map(fb=>`<div class="attr-subrow"><span>${fb.name}</span>${trPts(fb.c)}</div>`).join("")+`</div>`;
+      if(c.name==="Sabit Getiri"&&at.fixed&&at.fixed.length)sub=`<div class="attr-sub">`+at.fixed.map(fb=>`<div class="attr-subrow"><span>${fb.name}</span>${trPts3(fb.c)}</div>`).join("")+`</div>`;
       return `<div class="attr-row"><div class="attr-nm">${c.name}</div><div class="attr-track"><div class="attr-bar ${pos?'up':'down'}" style="width:${w}%"></div></div><div class="attr-c ${pos?'up':'down'}">${trPts(c.c)}</div></div>${sub}`;
     }).join("");
     const apBtns=[["d","Günlük"],["w","Haftalık"],["m","Aylık"]].map(x=>`<button class="trp-pbtn${trAttrPer===x[0]?' on':''}" data-ap="${x[0]}">${x[1]}</button>`).join("");
