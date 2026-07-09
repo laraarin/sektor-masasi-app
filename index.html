@@ -793,6 +793,16 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .trot-ret{font-family:var(--mono);font-size:12px;text-align:right}
 .trot-br{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right}
 .trot-z{font-family:var(--mono);font-size:11px;text-align:right;color:var(--muted)}
+.attr-row{display:grid;grid-template-columns:150px 1fr 84px;align-items:center;gap:10px;padding:6px 0}
+.attr-nm{font-size:12px;font-weight:600;color:var(--text)}
+.attr-track{position:relative;height:14px;background:var(--surface-2);border-radius:3px}
+.attr-track:before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line-cool)}
+.attr-bar{position:absolute;top:2px;bottom:2px;border-radius:2px}
+.attr-bar.up{background:var(--good)}
+.attr-bar.down{background:var(--bad)}
+.attr-c{font-family:var(--mono);font-size:12px;text-align:right}
+.attr-sub{margin:0 0 8px 18px;border-left:2px solid var(--line);padding-left:12px}
+.attr-subrow{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:11px;color:var(--muted);font-family:var(--mono)}
 .tru-add{margin-left:auto;background:transparent;border:1px dashed var(--line-cool);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer}
 .tru-add:hover{color:var(--accent);border-color:var(--accent)}
 .tru-chips{display:flex;flex-direction:column;gap:5px}
@@ -901,7 +911,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s18</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s19</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabRot">Rotasyon</button>
@@ -2923,7 +2933,7 @@ function renderTRRot(){
   document.querySelectorAll("#trBody .trot-pbtn[data-rw]").forEach(b=>b.onclick=()=>{trRotWin=b.dataset.rw;renderTRRot();});
   document.querySelectorAll("#trBody .trot-pbtn[data-rb]").forEach(b=>b.onclick=()=>{trRotBase=b.dataset.rb;renderTRRot();});
 }
-let trUniFilter="", trFundPeriod="w";
+let trUniFilter="", trFundPeriod="w", trAttrPer="w";
 function renderTRUniverse(){
   const secs=trSectors, stocks=trAllStocks();
   const unclassified=stocks.filter(tk=>trRowTotal(tk)===0);
@@ -3046,7 +3056,21 @@ function renderTRFund(){
     bondHtml=`<div class="trr-card" style="margin-top:14px"><div class="trr-h">Borçlanma Araçları <span class="trr-sub">(BIST tbliste eşleşmesi · toplam %${(d.bondTl/d.totalTl*100).toFixed(1)})</span></div>${bRows}
       <div style="overflow:auto;margin-top:12px"><table class="trr-tbl"><thead><tr><th>ISIN</th><th>İhraççı</th><th>Tür</th><th>Getiri</th><th class="r">Vade (g)</th><th class="r">mn ₺</th><th class="r">Fon %</th></tr></thead><tbody>${bTbl}</tbody></table></div></div>`;
   }
+  const at=d.attribution?d.attribution[trAttrPer]:null;
+  let attrHtml="";
+  if(at&&at.classes&&at.classes.length){
+    const amax=Math.max(...at.classes.map(c=>Math.abs(c.c)),0.01);
+    const clsRows=at.classes.map(c=>{
+      const pos=c.c>=0,w=(Math.abs(c.c)/amax*50).toFixed(0);
+      let sub="";
+      if(c.name==="Sabit Getiri"&&at.fixed&&at.fixed.length)sub=`<div class="attr-sub">`+at.fixed.map(fb=>`<div class="attr-subrow"><span>${fb.name}</span>${trPts(fb.c)}</div>`).join("")+`</div>`;
+      return `<div class="attr-row"><div class="attr-nm">${c.name}</div><div class="attr-track"><div class="attr-bar ${pos?'up':'down'}" style="${pos?'left:50%':'right:50%'};width:${w}%"></div></div><div class="attr-c">${trPts(c.c)}</div></div>${sub}`;
+    }).join("");
+    const apBtns=[["d","Günlük"],["w","Haftalık"],["m","Aylık"]].map(x=>`<button class="trp-pbtn${trAttrPer===x[0]?' on':''}" data-ap="${x[0]}">${x[1]}</button>`).join("");
+    attrHtml=`<div class="trr-card" style="margin-top:14px"><div class="trr-h" style="display:flex;align-items:center">Getiri Katkısı — neyden kazandık? <span class="trr-sub" style="margin-left:6px">toplam ${trPts(at.total)}</span><span class="trp-per">${apBtns}</span></div>${clsRows}<div class="tr-hint" style="margin-top:8px">Fonun kendi günlük değerlemesinden (birim fiyat = TL/nominal). VİOP/nakit/döviz hariç. Puan = fona katkı.</div></div>`;
+  }
   body.innerHTML=`${warn}<div class="trr-tools"><button class="tr-addsec" id="trRecalc">🔄 Yeniden hesapla</button></div>
+    ${attrHtml}
     <div class="trr-card"><div class="trh-row">
       <div class="trh-alloc"><div class="trr-h">Varlık Dağılımı</div><div class="tra-stack">${stackSegs}</div><div class="tra-legend">${legend}</div></div>
       <div class="trh-ret"><div class="trr-h">Hisse Getirisi <span class="trr-sub">(piyasa · ağırlıklı)</span></div>${retStrip}</div>
@@ -3060,7 +3084,8 @@ function renderTRFund(){
     </div>`;
   const am=document.getElementById("trAddMissing");if(am)am.onclick=()=>{missing.forEach(t=>{if(!trAllStocks().includes(t))trCustomStocks.push(t);});saveTRStocks();flash(missing.length+" hisse Yatırım Evreni'ne eklendi");renderTRFund();};
   document.getElementById("trRecalc").onclick=()=>renderTRFund();
-  document.querySelectorAll("#trBody .trp-pbtn").forEach(b=>{b.onclick=()=>{trFundPeriod=b.dataset.per;renderTRFund();};});
+  document.querySelectorAll("#trBody .trp-pbtn[data-per]").forEach(b=>{b.onclick=()=>{trFundPeriod=b.dataset.per;renderTRFund();};});
+  document.querySelectorAll("#trBody .trp-pbtn[data-ap]").forEach(b=>{b.onclick=()=>{trAttrPer=b.dataset.ap;renderTRFund();};});
   document.querySelectorAll("#trBody .trp-tk").forEach(el=>el.onclick=()=>openTRDetail(el.textContent.trim()));
 }
 document.getElementById("trBtn").onclick=openTR;
