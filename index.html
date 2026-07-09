@@ -756,18 +756,18 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .tru-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(500px,1fr));gap:12px;align-items:start}
 .tru-co3{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
 .tru-co3:last-child{border-bottom:none}
-.tru3-chart{flex:0 0 33%;min-width:120px;align-self:stretch;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:4px;display:flex;align-items:center}
-.tru3-chart svg{display:block;width:100%}
-.tru3-nochart{font-size:10px;color:var(--faint);text-align:center;width:100%}
-.tru3-mid{flex:1;min-width:0}
-.tru3-head{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:5px}
-.tru3-nm{font-size:11px;color:var(--muted)}
-.tru3-fin{flex:0 0 150px;text-align:right}
-.tru3-px{font-family:var(--mono);font-size:13px;color:var(--text);margin-bottom:5px}
-.tru3-metrics{display:flex;flex-direction:column;gap:2px;align-items:flex-end;margin-bottom:7px}
+.tru3-fin{flex:0 0 150px;min-width:0}
+.tru3-tkline{margin-bottom:3px}
+.tru3-px{font-family:var(--mono);font-size:13px;color:var(--text);margin-bottom:6px}
+.tru3-metrics{display:flex;flex-direction:column;gap:2px;align-items:flex-start;margin-bottom:8px}
 .tru3-metrics .m{font-size:11px;color:var(--muted)}
 .tru3-wbox{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
 .tru3-wbox .tru-w{width:44px}
+.tru3-mid{flex:1;min-width:0}
+.tru3-nm2{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px}
+.tru3-chart{flex:0 0 34%;min-width:130px;align-self:stretch;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:4px;display:flex;align-items:center}
+.tru3-chart svg{display:block;width:100%}
+.tru3-nochart{font-size:10px;color:var(--faint);text-align:center;width:100%}
 .tru-note{outline:none;cursor:text;min-height:34px;white-space:pre-wrap;font-size:12px;color:var(--muted);line-height:1.5}
 .tru-note:focus{background:var(--surface-2);border-radius:5px;padding:5px 7px;color:var(--text)}
 .tru-note:empty:before{content:"＋ açıklama yaz…";color:var(--faint)}
@@ -776,6 +776,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .tru-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .tru-name{font-weight:600;font-size:13px;color:var(--text)}
 .tru-cnt{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border-radius:20px;padding:1px 7px}
+.tru-med{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface-2);border-radius:20px;padding:1px 8px}
 .tru-add{margin-left:auto;background:transparent;border:1px dashed var(--line-cool);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer}
 .tru-add:hover{color:var(--accent);border-color:var(--accent)}
 .tru-chips{display:flex;flex-direction:column;gap:5px}
@@ -884,7 +885,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s16</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s17</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -2876,7 +2877,9 @@ function renderTRUniverse(){
   secs.forEach(s=>{
     const inSec=stocks.filter(tk=>trCell(tk,s)>0);
     const chips=inSec.map(tk=>truCo(tk,s)).join("");
-    cards+=`<div class="tru-card"><div class="tru-head"><span class="tru-name">${s}</span><span class="tru-cnt">${inSec.length}</span><button class="tru-add" data-sec="${s}">+ hisse</button></div><div class="tru-chips">${chips||'<span class="tr-hint">— boş —</span>'}</div></div>`;
+    const pes=inSec.map(tk=>{const q=(trHisseData&&trHisseData.quotes)?trHisseData.quotes[tk]:null;return q&&q.pe;}).filter(v=>v&&v>0).sort((a,b)=>a-b);
+    const medTag=pes.length?`<span class="tru-med">Medyan F/K ${pes[Math.floor((pes.length-1)/2)].toFixed(1)}</span>`:'';
+    cards+=`<div class="tru-card"><div class="tru-head"><span class="tru-name">${s}</span><span class="tru-cnt">${inSec.length}</span>${medTag}<button class="tru-add" data-sec="${s}">+ hisse</button></div><div class="tru-chips">${chips||'<span class="tr-hint">— boş —</span>'}</div></div>`;
   });
   cards+=`<div class="tru-card tru-newsec"><button class="tru-newbtn" id="trAddSec">+ yeni sektör</button></div>`;
   let unclHtml="";
@@ -2924,10 +2927,9 @@ function truCo(tk,s){
     if(q.hist&&q.hist.length>1)spark=trSpark(q.hist,72);
   }
   return `<div class="tru-co3${warn?' tru-warn':''}" data-tk="${tk}">
+    <div class="tru3-fin"><div class="tru3-tkline"><span class="tkr">${tk}</span></div>${pxLine}${metrics}<div class="tru3-wbox"><input class="tru-w" data-tk="${tk}" data-sec="${s}" value="${v}"> % <button class="tru-x" data-tk="${tk}" data-sec="${s}" title="Sektörden çıkar">×</button></div></div>
+    <div class="tru3-mid"><div class="tru3-nm2">${E(nm)}</div><div class="note tru-note" contenteditable data-tk="${tk}">${E(trDesc[tk])}</div></div>
     <div class="tru3-chart">${spark}</div>
-    <div class="tru3-mid"><div class="tru3-head"><span class="tkr">${tk}</span> <span class="tru3-nm">${E(nm)}</span></div>
-      <div class="note tru-note" contenteditable data-tk="${tk}">${E(trDesc[tk])}</div></div>
-    <div class="tru3-fin">${pxLine}${metrics}<div class="tru3-wbox"><input class="tru-w" data-tk="${tk}" data-sec="${s}" value="${v}"> % <button class="tru-x" data-tk="${tk}" data-sec="${s}" title="Sektörden çıkar">×</button></div></div>
   </div>`;
 }
 function openTRDetail(tk){
