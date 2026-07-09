@@ -790,6 +790,24 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .trp-pbtn.on{background:var(--accent);border-color:var(--accent);color:#1a1204;font-weight:600}
 .trp-scale{height:5px;background:var(--ground);border-radius:3px;margin-bottom:9px;overflow:hidden}
 .trp-scale i{display:block;height:100%;border-radius:3px}
+#trDetailCard{max-width:640px}
+.trd-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding-right:28px}
+.trd-tk{font-family:var(--mono);font-weight:700;font-size:20px;color:var(--text)}
+.trd-nm{font-size:12px;color:var(--muted);margin-top:2px}
+.trd-px{text-align:right}
+.trd-price{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text)}
+.trd-ccy{font-size:12px;color:var(--muted);font-weight:400}
+.trd-chart{margin:14px 0;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px}
+.trd-fins{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:10px}
+.trd-f{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+.trd-f span{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
+.trd-f b{font-family:var(--mono);font-size:14px;color:var(--text)}
+.trd-ind{font-size:12px;color:var(--muted);margin-bottom:10px}
+.trd-sum{font-size:13px;line-height:1.55;color:var(--text);max-height:220px;overflow:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px}
+.tru-tk{cursor:pointer}
+.tru-tk:hover{color:var(--accent);text-decoration:underline}
+.trp-tk{cursor:pointer}
+.trp-tk:hover{color:var(--accent)}
 .trh-row{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
 .trh-alloc{flex:1;min-width:280px}
 .trh-ret{flex:0 0 auto;min-width:210px}
@@ -848,7 +866,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s13</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s14</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -868,6 +886,11 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
     </div>
   </div>
   <div class="tr-body" id="trBody"></div>
+</div>
+
+<div class="modal" id="trDetail" hidden style="z-index:95">
+  <div class="modal-bg" data-close="trd"></div>
+  <div class="modal-card big" id="trDetailCard"></div>
 </div>
 
 <div class="fon-sheet" id="fonModal" hidden>
@@ -953,7 +976,7 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json",akisFile:"sektor_akis.json",raporFiles:{BV1:"bv1-rapor.json",BVD:"bvd-rapor.json"}};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json",akisFile:"sektor_akis.json",raporFiles:{BV1:"bv1-rapor.json",BVD:"bvd-rapor.json"},trHisseFile:"tr-hisse-verileri.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
@@ -964,6 +987,7 @@ let fonData=null, fonCommit=null, fonFund="ALL";  // fon_portfoy.json (BVV/BTK p
 let taramaData=null, taramaCommit=null;  // sektor-tarama.json (haftalık sektör rotasyon taraması, Actions Çar & Cum üretir)
 let akisData=null, akisCommit=null, akisWin="1h";  // sektor_akis.json (ETF fon akışı, fon-akis-uret.py üretir)
 let trRapors={}, trRaporCommits={};  // fon kodu -> rapor json (fon-rapor-uret.py üretir)
+let trHisseData=null, trHisseCommit=null;  // tr-hisse-verileri.json (TR hisse fiyat/finansal/grafik/özet)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -1065,6 +1089,13 @@ async function ghLoadTRRapor(){
     }catch(e){}
   }
 }
+async function ghLoadTRHisse(){
+  const r=await ghApi("/contents/"+GH.trHisseFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.quotes)trHisseData=d;}
+  trHisseCommit=await ghLatestCommit(GH.trHisseFile);
+}
 async function ghLoadRegimeChart(){
   const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
   if(!r.ok)return;
@@ -1119,6 +1150,8 @@ function startGitPoll(){
       const ac=await ghLatestCommit(GH.akisFile);
       if(ac&&ac!==akisCommit){await ghLoadAkis();if(!document.getElementById("akisModal").hidden)renderAkis();flash("Fon akışı güncellendi");}
       for(const f in GH.raporFiles){const c=await ghLatestCommit(GH.raporFiles[f]);if(c&&c!==trRaporCommits[f]){await ghLoadTRRapor();if(!document.getElementById("trSheet").hidden&&trTab==="fund")renderTRFund();flash(f+" raporu güncellendi");break;}}
+      const thc=await ghLatestCommit(GH.trHisseFile);
+      if(thc&&thc!==trHisseCommit){await ghLoadTRHisse();}
     }catch(e){}finally{ghBusy=false;}
   },25000);
 }
@@ -1150,7 +1183,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -2848,11 +2881,38 @@ function renderTRUniverse(){
   document.getElementById("trFilter").oninput=e=>{trUniFilter=e.target.value;applyF();};
   document.getElementById("trAddStock").onclick=()=>{const t=prompt("Yeni hisse kodu (evrene eklenir, sonra sektöre atarsın):");if(!t||!t.trim())return;const tk=t.trim().toUpperCase();if(trAllStocks().includes(tk)){alert(tk+" zaten var.");return;}trCustomStocks.push(tk);saveTRStocks();renderTRUniverse();};
   document.getElementById("trAddSec").onclick=()=>{const n=prompt("Yeni sektör adı:");if(n&&n.trim()&&!trSectors.includes(n.trim())){trSectors.push(n.trim());saveTRSectors();renderTRUniverse();}};
+  document.querySelectorAll("#trBody .tru-tk").forEach(el=>el.onclick=()=>openTRDetail(el.textContent.trim()));
 }
 function trRet(v){if(v==null)return '<span class="trr-na">–</span>';const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(1)}%</span>`;}
 function trPts(v){const c=v>0?'trr-up':(v<0?'trr-dn':'');return `<span class="${c}">${v>0?'+':''}${v.toFixed(2)} p</span>`;}
 function trFmtMn(v){return (v/1e6).toFixed(1).replace('.',',')+" mn ₺";}
 function trFbSec(e){return e.market==="ABD"?"ABD (Yabancı)":((e.market&&e.market!=="TR")?"Yabancı":"(Sınıfsız)");}
+function trhFmtCap(v){if(!v)return "—";if(v>=1e9)return (v/1e9).toFixed(1).replace('.',',')+" mr ₺";if(v>=1e6)return (v/1e6).toFixed(0)+" mn ₺";return Math.round(v).toLocaleString("tr-TR")+" ₺";}
+function trSpark(cl){if(!cl||cl.length<2)return '<div class="tr-hint" style="padding:20px;text-align:center">Grafik verisi yok</div>';const w=600,h=120,p=6,mn=Math.min(...cl),mx=Math.max(...cl),rng=(mx-mn)||1;const pts=cl.map((c,i)=>`${(p+i/(cl.length-1)*(w-2*p)).toFixed(1)},${(h-p-(c-mn)/rng*(h-2*p)).toFixed(1)}`).join(" ");const up=cl[cl.length-1]>=cl[0];return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="120" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up?'var(--good)':'var(--bad)'}" stroke-width="1.6"/></svg>`;}
+function openTRDetail(tk){
+  const d=(trHisseData&&trHisseData.quotes)?trHisseData.quotes[tk]:null;
+  const card=document.getElementById("trDetailCard");
+  const secs=Object.keys(trMap[tk]||{});
+  const E=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  if(!d){card.innerHTML=`<button class="modal-x" data-close="trd">✕</button><div class="trd-top"><div><div class="trd-tk">${tk}</div></div></div><div class="tr-hint" style="margin-top:14px">Bu hisse için veri yok — TR hisse verisi henüz gelmedi ya da ${tk} yfinance'te bulunamadı. (Veri için ABD tarafında token gerekir.)</div>`;}
+  else{
+    const chg=d.changePct,chgC=chg>0?'trr-up':(chg<0?'trr-dn':'');
+    card.innerHTML=`<button class="modal-x" data-close="trd">✕</button>
+      <div class="trd-top"><div><div class="trd-tk">${tk}</div><div class="trd-nm">${E(d.name)}</div></div>
+        <div class="trd-px"><div class="trd-price">${d.price!=null?d.price.toLocaleString("tr-TR"):'—'} <span class="trd-ccy">${d.ccy||''}</span></div><div class="${chgC}" style="font-family:var(--mono)">${chg!=null?(chg>0?'+':'')+chg.toFixed(2)+'%':''}</div></div></div>
+      <div class="trd-chart">${trSpark(d.hist)}</div>
+      <div class="trd-fins">
+        <div class="trd-f"><span>Piyasa Değeri</span><b>${trhFmtCap(d.marketCap)}</b></div>
+        <div class="trd-f"><span>F/K</span><b>${d.pe!=null?d.pe.toFixed(1):'—'}</b></div>
+        <div class="trd-f"><span>İleri F/K</span><b>${d.fwdPe!=null?d.fwdPe.toFixed(1):'—'}</b></div>
+        <div class="trd-f"><span>Evrende sektör</span><b>${secs.join(', ')||'—'}</b></div>
+      </div>
+      ${d.industry?`<div class="trd-ind">${E(d.industry)}${d.sector?' · '+E(d.sector):''}</div>`:''}
+      <div class="trd-sum">${E(d.summary)||'<span class="tr-hint">Açıklama yok.</span>'}</div>`;
+  }
+  document.getElementById("trDetail").hidden=false;
+}
+function closeTRDetail(){document.getElementById("trDetail").hidden=true;}
 function renderTRFund(){
   const d=trRapors[trFund], body=document.getElementById("trBody"), meta=document.getElementById("trBarMeta");
   if(!d){meta.textContent="";body.innerHTML=`<div style="padding:48px;text-align:center;color:var(--muted)"><div style="font-size:16px;margin-bottom:10px">📄 ${trFund} Fon Raporu</div><div class="tr-hint" style="max-width:540px;margin:0 auto">Rapor verisi özel repodan gelir. Görmek için ABD tarafında sağ üstten <b>Token</b> gir. fon_database güncellenince rapor otomatik yenilenir.</div></div>`;return;}
@@ -2904,6 +2964,7 @@ function renderTRFund(){
   const am=document.getElementById("trAddMissing");if(am)am.onclick=()=>{missing.forEach(t=>{if(!trAllStocks().includes(t))trCustomStocks.push(t);});saveTRStocks();flash(missing.length+" hisse Yatırım Evreni'ne eklendi");renderTRFund();};
   document.getElementById("trRecalc").onclick=()=>renderTRFund();
   document.querySelectorAll("#trBody .trp-pbtn").forEach(b=>{b.onclick=()=>{trFundPeriod=b.dataset.per;renderTRFund();};});
+  document.querySelectorAll("#trBody .trp-tk").forEach(el=>el.onclick=()=>openTRDetail(el.textContent.trim()));
 }
 document.getElementById("trBtn").onclick=openTR;
 document.getElementById("trTabUni").onclick=()=>trSetTab("uni");
@@ -2940,15 +3001,16 @@ document.querySelectorAll('[data-close="fon"]').forEach(el=>el.onclick=closeFon)
 document.querySelectorAll('[data-close="tarama"]').forEach(el=>el.onclick=closeTarama);
 document.querySelectorAll('[data-close="akis"]').forEach(el=>el.onclick=closeAkis);
 document.querySelectorAll('[data-close="tr"]').forEach(el=>el.onclick=closeTR);
+document.querySelectorAll('[data-close="trd"]').forEach(el=>el.onclick=closeTRDetail);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
-document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();else if(!document.getElementById("trSheet").hidden)closeTR();});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();else if(!document.getElementById("trDetail").hidden)closeTRDetail();else if(!document.getElementById("trSheet").hidden)closeTR();});
 
 /* ---------- startup ---------- */
 async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
