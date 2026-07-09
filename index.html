@@ -753,16 +753,25 @@ table.trm thead th.trm-tot{z-index:4}
 table.trm tr.trm-empty td.trm-tot{color:var(--accent)}
 table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .tr-addsec{background:transparent;border:1px dashed var(--line-cool);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer}
-.tru-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:12px;align-items:start}
-.tru-co{padding:9px 0;border-bottom:1px solid var(--line)}
-.tru-co:last-child{border-bottom:none}
-.tru-co .co-right{align-items:center;gap:6px}
-.tru-wbox{display:inline-flex;align-items:center;gap:2px;font-family:var(--mono);font-size:11px;color:var(--muted)}
-.tru-co .tru-w{width:44px}
-.tru-spark{margin:7px 0 3px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:3px 4px}
-.tru-note{margin-top:5px;outline:none;cursor:text;min-height:15px;white-space:pre-wrap;font-size:12px;color:var(--muted);line-height:1.5}
+.tru-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(500px,1fr));gap:12px;align-items:start}
+.tru-co3{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--line)}
+.tru-co3:last-child{border-bottom:none}
+.tru3-chart{flex:0 0 33%;min-width:120px;align-self:stretch;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:4px;display:flex;align-items:center}
+.tru3-chart svg{display:block;width:100%}
+.tru3-nochart{font-size:10px;color:var(--faint);text-align:center;width:100%}
+.tru3-mid{flex:1;min-width:0}
+.tru3-head{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+.tru3-nm{font-size:11px;color:var(--muted)}
+.tru3-fin{flex:0 0 150px;text-align:right}
+.tru3-px{font-family:var(--mono);font-size:13px;color:var(--text);margin-bottom:5px}
+.tru3-metrics{display:flex;flex-direction:column;gap:2px;align-items:flex-end;margin-bottom:7px}
+.tru3-metrics .m{font-size:11px;color:var(--muted)}
+.tru3-wbox{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.tru3-wbox .tru-w{width:44px}
+.tru-note{outline:none;cursor:text;min-height:34px;white-space:pre-wrap;font-size:12px;color:var(--muted);line-height:1.5}
 .tru-note:focus{background:var(--surface-2);border-radius:5px;padding:5px 7px;color:var(--text)}
 .tru-note:empty:before{content:"＋ açıklama yaz…";color:var(--faint)}
+.tru-co3.tru-warn .tru-w{border-color:var(--accent)}
 .tru-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 13px;display:flex;flex-direction:column}
 .tru-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .tru-name{font-weight:600;font-size:13px;color:var(--text)}
@@ -875,7 +884,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s15</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s16</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -2881,7 +2890,7 @@ function renderTRUniverse(){
     </div>
     <div class="tru-grid">${cards}</div>${unclHtml}`;
   document.getElementById("trBarMeta").textContent=`Fon: ${trFund} · ${stocks.length} hisse · ${secs.length} sektör`;
-  const applyF=()=>{const q=trUniFilter.trim().toUpperCase();document.querySelectorAll("#trBody .tru-co,#trBody .tru-uchip").forEach(ch=>{ch.style.display=(!q||(ch.dataset.tk||"").toUpperCase().indexOf(q)>=0)?"":"none";});};
+  const applyF=()=>{const q=trUniFilter.trim().toUpperCase();document.querySelectorAll("#trBody .tru-co3,#trBody .tru-uchip").forEach(ch=>{ch.style.display=(!q||(ch.dataset.tk||"").toUpperCase().indexOf(q)>=0)?"":"none";});};
   applyF();
   document.querySelectorAll("#trBody .tru-note").forEach(el=>{el.onblur=()=>{trDesc[el.dataset.tk]=el.innerText.trim();saveTRDesc();};});
   document.querySelectorAll("#trBody .tru-w").forEach(inp=>{inp.onchange=()=>{let v=parseFloat(inp.value);if(isNaN(v)||v<0)v=0;if(v>100)v=100;trSetCell(inp.dataset.tk,inp.dataset.sec,v);renderTRUniverse();};});
@@ -2903,21 +2912,23 @@ function truCo(tk,s){
   const v=trCell(tk,s), tot=trRowTotal(tk), warn=Math.abs(tot-100)>=0.05;
   const q=(trHisseData&&trHisseData.quotes)?trHisseData.quotes[tk]:null;
   const E=x=>(x||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
-  let px="", metrics="", nm=tk, spark="";
+  let pxLine="", metrics="", nm=tk, spark='<div class="tru3-nochart">grafik yok</div>';
   if(q){
     nm=q.name||tk;
-    if(q.price!=null){const chg=q.changePct,cls=chg>0?"up":(chg<0?"down":"");px=`<span class="px">${q.price.toLocaleString("tr-TR")}${(q.ccy==='TRY'||!q.ccy)?' ₺':' '+q.ccy}${chg!=null?` <span class="chg ${cls}">${chg>0?'+':''}${chg.toFixed(2)}%</span>`:''}</span>`;}
+    if(q.price!=null){const chg=q.changePct,cls=chg>0?"up":(chg<0?"down":"");pxLine=`<div class="tru3-px">${q.price.toLocaleString("tr-TR")}${(q.ccy==='TRY'||!q.ccy)?' ₺':' '+q.ccy}${chg!=null?` <span class="chg ${cls}">${chg>0?'+':''}${chg.toFixed(2)}%</span>`:''}</div>`;}
     const p=[];
     if(q.pe!=null)p.push(`<span class="m">F/K <b>${q.pe.toFixed(1)}</b></span>`);
     if(q.fwdPe!=null)p.push(`<span class="m">İleri F/K <b>${q.fwdPe.toFixed(1)}</b></span>`);
     if(q.marketCap)p.push(`<span class="m">Piy.Değ. <b>${trhFmtCap(q.marketCap)}</b></span>`);
-    if(p.length)metrics=`<div class="metrics">${p.join("")}</div>`;
-    if(q.hist&&q.hist.length>1)spark=`<div class="tru-spark">${trSpark(q.hist,44)}</div>`;
+    metrics=`<div class="tru3-metrics">${p.join("")}</div>`;
+    if(q.hist&&q.hist.length>1)spark=trSpark(q.hist,72);
   }
-  return `<div class="co tru-co${warn?' tru-warn':''}" data-tk="${tk}">
-    <div class="co-id"><span class="tkr">${tk}</span>${px}${metrics}</div>
-    <div class="co-right"><span class="tru-wbox"><input class="tru-w" data-tk="${tk}" data-sec="${s}" value="${v}">%</span><button class="tru-x" data-tk="${tk}" data-sec="${s}" title="Sektörden çıkar">×</button></div>
-    <div class="meta"><div class="nm">${E(nm)}</div>${spark}<div class="note tru-note" contenteditable data-tk="${tk}">${E(trDesc[tk])}</div></div></div>`;
+  return `<div class="tru-co3${warn?' tru-warn':''}" data-tk="${tk}">
+    <div class="tru3-chart">${spark}</div>
+    <div class="tru3-mid"><div class="tru3-head"><span class="tkr">${tk}</span> <span class="tru3-nm">${E(nm)}</span></div>
+      <div class="note tru-note" contenteditable data-tk="${tk}">${E(trDesc[tk])}</div></div>
+    <div class="tru3-fin">${pxLine}${metrics}<div class="tru3-wbox"><input class="tru-w" data-tk="${tk}" data-sec="${s}" value="${v}"> % <button class="tru-x" data-tk="${tk}" data-sec="${s}" title="Sektörden çıkar">×</button></div></div>
+  </div>`;
 }
 function openTRDetail(tk){
   const d=(trHisseData&&trHisseData.quotes)?trHisseData.quotes[tk]:null;
