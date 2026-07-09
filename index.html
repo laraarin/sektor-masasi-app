@@ -897,6 +897,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .trr-tk{font-size:11px;color:var(--muted);margin-bottom:4px}
 .trr-tv{font-family:var(--mono);font-size:20px;font-weight:600}
 .trr-ci{display:flex;justify-content:space-between;padding:5px 2px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
+.trr-ci-h{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px}
 .trr-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .trr-tbl th,.trr-tbl td{padding:5px 10px;border-bottom:1px solid var(--line);text-align:left}
 .trr-tbl th.r,.trr-tbl td.r{text-align:right;font-family:var(--mono)}
@@ -916,7 +917,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s20</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s21</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabRot">Rotasyon</button>
@@ -3039,10 +3040,21 @@ function renderTRFund(){
     const tg=tot>0?Object.keys(m).map(s=>[s,(+m[s]||0)/tot]):[[trFbSec(e),1]];
     tg.forEach(([s,sh])=>{const w=e.wEq*sh;const o=bySec[s]||(bySec[s]={w:0,wn:0,wd:0});o.w+=w;if(e.ret1w!=null){o.wn+=w*e.ret1w;o.wd+=w;}});});
   const unc=(bySec["(Sınıfsız)"]||{}).w||0;
-  const contrib=d.equities.filter(e=>e.ret1w!=null).map(e=>({t:e.ticker,c:e.wEq*e.ret1w/100})).sort((a,b)=>b.c-a.c);
+  const PER={d:'ret1d',w:'ret1w',m:'ret1m'}, perKey=PER[trFundPeriod]||'ret1w';
+  const perName={d:'1 gün',w:'1 hafta',m:'1 ay'}[trFundPeriod]||'1 hafta';
+  const contrib=d.equities.filter(e=>e[perKey]!=null).map(e=>({t:e.ticker,c:e.wEq*e[perKey]/100})).sort((a,b)=>b.c-a.c);
   const win=contrib.filter(x=>x.c>0).slice(0,6), los=contrib.filter(x=>x.c<0).slice(-6).reverse();
   const ci=(arr)=>arr.length?arr.map(x=>`<div class="trr-ci"><span>${x.t}</span>${trPts(x.c)}</div>`).join(""):`<div class="tr-hint">—</div>`;
-  const PER={d:'ret1d',w:'ret1w',m:'ret1m'}, perKey=PER[trFundPeriod]||'ret1w';
+  const comm=d.commodities||[];
+  let commHtml="";
+  if(comm.length){
+    const crows=comm.map(c=>{
+      const mid=c.viop?`<span class="trp-wv">VİOP</span>`:`<span class="trp-wv">${c.tl!=null?trFmtMn(c.tl):''}</span>`;
+      const rv=c.viop?`<span class="trp-rv trr-sub">pozisyon</span>`:`<span class="trp-rv">%${c.wFund.toFixed(2)}</span>`;
+      return `<div class="trp-row"><span style="font-family:var(--mono);font-weight:600;color:var(--text)">${c.name}</span>${mid}${rv}</div>`;
+    }).join("");
+    commHtml=`<div class="trr-card" style="margin-top:14px"><div class="trr-h">Emtia <span class="trr-sub">(Varlık Dağılımı'ndaki Emtia kaleminin dökümü)</span></div><div class="trp-rows" style="border-top:none;padding-top:0">${crows}</div><div class="tr-hint" style="margin-top:8px">Fiziki altın fon ağırlığına dahildir. VİOP emtia futures'ları teminatla tutulduğundan ağırlığı %0 görünür (notional sayılmaz), yalnızca pozisyon olarak listelenir.</div></div>`;
+  }
   const posBySec={};
   d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let t=0;for(const k in m)t+=(+m[k]||0);const tg=t>0?Object.keys(m).map(k=>[k,(+m[k]||0)/t]):[[trFbSec(e),1]];tg.forEach(([s,sh])=>{(posBySec[s]=posBySec[s]||[]).push({tk:e.ticker,w:e.wEq*sh,r:e[perKey]});});});
   const posSecs=Object.entries(posBySec).map(([s,arr])=>{arr.sort((a,b)=>b.w-a.w);const w=arr.reduce((a,x)=>a+x.w,0);let rn=0,rd=0;arr.forEach(x=>{if(x.r!=null){rn+=x.w*x.r;rd+=x.w;}});return{s,arr,w,r:rd?rn/rd:null};}).sort((a,b)=>(b.r==null?-1e9:b.r)-(a.r==null?-1e9:a.r));
@@ -3078,13 +3090,15 @@ function renderTRFund(){
       <div class="trh-alloc"><div class="trr-h">Varlık Dağılımı</div><div class="tra-stack">${stackSegs}</div><div class="tra-legend">${legend}</div></div>
       <div class="trh-ret"><div class="trr-h">Hisse Getirisi <span class="trr-sub">(piyasa · ağırlıklı)</span></div>${retStrip}</div>
     </div></div>
+    ${commHtml}
     ${attrHtml}`;
   const hisseHtml=`<div class="trr-card"><div class="trr-h" style="display:flex;align-items:center">Sektör Bazında <span class="trr-sub" style="margin-left:6px">(${d.equities.length} hisse${unc>0?` · sınıfsız %${unc.toFixed(1)}`:''})</span><span class="trp-per">${perBtns}</span></div>
       <div class="trp-grid">${posCards}</div></div>
-    <div class="trr-grid" style="margin-top:14px">
-      <div class="trr-card"><div class="trr-h">🟢 En çok kazandıran <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(win)}</div>
-      <div class="trr-card"><div class="trr-h">🔴 En çok kaybettiren <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(los)}</div>
-    </div>`;
+    <div class="trr-card" style="margin-top:14px"><div class="trr-h" style="display:flex;align-items:center">Katkı Puanı <span class="trr-sub" style="margin-left:6px">(${perName} · ağırlık × getiri, puan)</span><span class="trp-per">${perBtns}</span></div>
+      <div class="trr-grid" style="margin-top:2px">
+        <div><div class="trr-ci-h">🟢 En çok kazandıran</div>${ci(win)}</div>
+        <div><div class="trr-ci-h">🔴 En çok kaybettiren</div>${ci(los)}</div>
+      </div></div>`;
   const borcHtml=bondHtml||`<div class="trr-card"><div class="tr-hint" style="padding:20px;text-align:center">Bu fonda borçlanma aracı yok.</div></div>`;
   const subTabs=[["genel","Genel"],["hisse","Hisse"],["borc","Borçlanma"]];
   const tabBar=`<div class="trf-tabs">`+subTabs.map(t=>`<button class="trf-tab${trFundSub===t[0]?' on':''}" data-sub="${t[0]}">${t[1]}</button>`).join("")+`</div>`;
