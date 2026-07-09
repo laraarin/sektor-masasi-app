@@ -788,6 +788,8 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 .trp-per{margin-left:auto;display:inline-flex;gap:3px}
 .trp-pbtn{background:transparent;border:1px solid var(--line-cool);color:var(--muted);border-radius:5px;padding:2px 9px;font-size:11px;cursor:pointer}
 .trp-pbtn.on{background:var(--accent);border-color:var(--accent);color:#1a1204;font-weight:600}
+.trp-scale{height:5px;background:var(--ground);border-radius:3px;margin-bottom:9px;overflow:hidden}
+.trp-scale i{display:block;height:100%;border-radius:3px}
 .trh-row{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
 .trh-alloc{flex:1;min-width:280px}
 .trh-ret{flex:0 0 auto;min-width:210px}
@@ -846,7 +848,7 @@ table.trm tr.trm-full td.trm-tot{color:var(--good)}
 
 <div class="tr-sheet" id="trSheet" hidden>
   <div class="tr-bar">
-    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s12</span></span>
+    <span class="tr-title">🇹🇷 TR Terminal <span style="font-size:10px;color:var(--faint);font-weight:400">s13</span></span>
     <div class="tr-tabs">
       <button class="tr-tab active" id="trTabUni">Yatırım Evreni</button>
       <button class="tr-tab" id="trTabFund">Fon Raporu</button>
@@ -2765,7 +2767,7 @@ function wireReportForm(){
 /* ================= TR Terminal ================= */
 const TR_STOCKS=["AEFES","AFYON","AGHOL","AKBNK","AKCNS","AKFYE","AKGRT","AKHAN","AKSEN","AKSGY","ALARK","ALBRK","ALTNY","ALVES","ANSGR","ARASE","ARCLK","ARDYZ","ARENA","ASELS","ASGYO","ASTOR","ATATR","AYGAZ","AZTEK","BALSU","BANVT","BESLR","BIGEN","BIMAS","BORSK","BRSAN","CCOLA","CIMSA","CLEBI","DMLKT","DMLKTG","DOAS","DOHOL","DSTKF","DZGYO","EBEBK","ECILC","EKGYO","EMPAE","ENJSA","ENKAI","EREGL","ESCOM","FENER","FROTO","GARAN","GEDZA","GENTS","GESAN","GLCVY","GLRMK","GOKNR","GOZDE","GSRAY","GUBRF","GWIND","HALKB","HEDEF","HEKTS","HLGYO","HOROZ","HUBVC","INDES","INFO","ISCTR","ISGYO","ISMEN","KAREL","KATMR","KCAER","KCHOL","KERVT","KIMMR","KLGYO","KONTR","KOZAA","KOZAL","KRDMD","KRONT","KRVGD","KTLEV","LILAK","LMKDC","LOGO","MACKO","MAKIM","MAVI","MERKO","MGROS","MOGAN","MPARK","NETCD","NTGAZ","ODINE","OFSYM","ORGE","OTKAR","OYAKC","OZATD","OZGYO","OZKGY","PENTA","PETKM","PGSUS","PSGYO","REEDR","SAHOL","SASA","SISE","SKBNK","SNGYO","SOKM","SUWEN","TABGD","TATEN","TAVHL","TCELL","TERA","THYAO","TKFEN","TOASO","TRALT","TRGYO","TRMET","TSKB","TSPOR","TTKOM","TUPRS","TURSG","ULKER","VAKBN","VAKKO","VESTL","VKGYO","XLBNK","YKBNK"];
 const TR_PREFILL={"AGHOL":"Holding","AKBNK":"Banka","AKSGY":"GYO / İnşaat","ALBRK":"Banka","ASELS":"Savunma","AYGAZ":"Petrol","DOHOL":"Holding","EKGYO":"GYO / İnşaat","ENKAI":"GYO / İnşaat","GARAN":"Banka","GUBRF":"Madenciler","HALKB":"Banka","HLGYO":"GYO / İnşaat","ISCTR":"Banka","ISGYO":"GYO / İnşaat","KCHOL":"Holding","KLGYO":"GYO / İnşaat","NTGAZ":"Petrol","OTKAR":"Savunma","OZKGY":"GYO / İnşaat","PETKM":"Petrol","PGSUS":"Havacılık","SAHOL":"Holding","SKBNK":"Banka","SNGYO":"GYO / İnşaat","TAVHL":"Havacılık","THYAO":"Havacılık","TRALT":"Madenciler","TRGYO":"GYO / İnşaat","TRMET":"Madenciler","TSKB":"Banka","TUPRS":"Petrol","VAKBN":"Banka","VKGYO":"GYO / İnşaat","XLBNK":"Banka","YKBNK":"Banka"};
-const TR_SECTORS_DEFAULT=["Banka","Holding","GYO / İnşaat","Petrol","Madenciler","Savunma","Havacılık","Sanayi","Teknoloji & Bilişim","Kimya","Demir-Çelik","Otomotiv","Perakende","Gıda & İçecek","Enerji & Elektrik","Telekom","Cam & Çimento","Sağlık","Sigorta & Finans","Turizm"];
+const TR_SECTORS_DEFAULT=["Banka","Holding","GYO / İnşaat","Petrol","Madenciler","Savunma","Havacılık","Sanayi","Teknoloji & Bilişim","Kimya","Demir-Çelik","Otomotiv","Perakende","Gıda & İçecek","Enerji & Elektrik","Telekom","Cam & Çimento","Sağlık","Sigorta & Finans","Turizm","Emtia"];
 // Otomatik sınıflandırma taslağı (ticker -> sektör). Sadece boştaki hisselere uygulanır; Lara sonra düzeltir.
 const TR_AUTO={"AEFES":"Gıda & İçecek","AFYON":"Cam & Çimento","AKCNS":"Cam & Çimento","AKFYE":"Enerji & Elektrik","AKGRT":"Sigorta & Finans","AKSEN":"Enerji & Elektrik","ALARK":"Holding","ALTNY":"Savunma","ALVES":"Sanayi","ANSGR":"Sigorta & Finans","ARCLK":"Sanayi","ARDYZ":"Teknoloji & Bilişim","ARENA":"Teknoloji & Bilişim","ASGYO":"GYO / İnşaat","ASTOR":"Enerji & Elektrik","ATATP":"Teknoloji & Bilişim","ATATR":"Teknoloji & Bilişim","AZTEK":"Teknoloji & Bilişim","BALSU":"Gıda & İçecek","BANVT":"Gıda & İçecek","BESLR":"Gıda & İçecek","BIMAS":"Perakende","BRSAN":"Demir-Çelik","CCOLA":"Gıda & İçecek","CIMSA":"Cam & Çimento","CLEBI":"Havacılık","DOAS":"Otomotiv","DSTKF":"Sigorta & Finans","DZGYO":"GYO / İnşaat","EBEBK":"Perakende","ECILC":"Sağlık","ENJSA":"Enerji & Elektrik","EREGL":"Demir-Çelik","ESCOM":"Teknoloji & Bilişim","FROTO":"Otomotiv","GEDZA":"Sanayi","GENTS":"Sanayi","GESAN":"Enerji & Elektrik","GLCVY":"Sigorta & Finans","GLRMK":"GYO / İnşaat","GOKNR":"Gıda & İçecek","GOZDE":"Holding","GWIND":"Enerji & Elektrik","HEDEF":"Holding","HEKTS":"Kimya","HOROZ":"Sanayi","HUBVC":"Holding","INDES":"Teknoloji & Bilişim","INFO":"Sigorta & Finans","ISMEN":"Sigorta & Finans","KAREL":"Teknoloji & Bilişim","KATMR":"Savunma","KCAER":"Demir-Çelik","KERVT":"Gıda & İçecek","KONTR":"Enerji & Elektrik","KOZAA":"Madenciler","KOZAL":"Madenciler","KRDMD":"Demir-Çelik","KRONT":"Teknoloji & Bilişim","KRVGD":"Gıda & İçecek","LIDFA":"Sigorta & Finans","LILAK":"Sanayi","LMKDC":"Cam & Çimento","LOGO":"Teknoloji & Bilişim","MACKO":"Teknoloji & Bilişim","MAKIM":"Sanayi","MAVI":"Perakende","MERKO":"Gıda & İçecek","MGROS":"Perakende","MOGAN":"Enerji & Elektrik","MPARK":"Sağlık","NTHOL":"Turizm","ODINE":"Teknoloji & Bilişim","ORGE":"Enerji & Elektrik","OYAKC":"Cam & Çimento","OZGYO":"GYO / İnşaat","PENTA":"Teknoloji & Bilişim","PSGYO":"GYO / İnşaat","REEDR":"Teknoloji & Bilişim","SASA":"Kimya","SDTTR":"Savunma","SISE":"Cam & Çimento","SOKM":"Perakende","SUWEN":"Perakende","TABGD":"Gıda & İçecek","TATEN":"Enerji & Elektrik","TCELL":"Telekom","TERA":"Sigorta & Finans","TKFEN":"Holding","TOASO":"Otomotiv","TTKOM":"Telekom","TURSG":"Sigorta & Finans","ULKER":"Gıda & İçecek","ULUFA":"Sigorta & Finans","VAKKO":"Perakende","VESTL":"Sanayi"};
 let trFund="BV1", trTab="uni", trSectors, trMap;
@@ -2793,6 +2795,7 @@ try{
     localStorage.setItem("sm-tr-autoapplied","1");
   }
 }catch(e){}
+try{ if(!localStorage.getItem("sm-tr-emtia")){ if(!trSectors.includes("Emtia")){trSectors.push("Emtia");saveTRSectors();} localStorage.setItem("sm-tr-emtia","1"); } }catch(e){}
 const TR_PASS="BV888";
 function trUnlocked(){try{return sessionStorage.getItem("sm-tr-unlock")==="1";}catch(e){return false;}}
 function trShowContent(){document.getElementById("trLock").hidden=true;document.getElementById("trBody").hidden=false;renderTR();}
@@ -2872,8 +2875,7 @@ function renderTRFund(){
   d.equities.forEach(e=>{const m=trMap[e.ticker]||{};let t=0;for(const k in m)t+=(+m[k]||0);const tg=t>0?Object.keys(m).map(k=>[k,(+m[k]||0)/t]):[[trFbSec(e),1]];tg.forEach(([s,sh])=>{(posBySec[s]=posBySec[s]||[]).push({tk:e.ticker,w:e.wEq*sh,r:e[perKey]});});});
   const posSecs=Object.entries(posBySec).map(([s,arr])=>{arr.sort((a,b)=>b.w-a.w);const w=arr.reduce((a,x)=>a+x.w,0);let rn=0,rd=0;arr.forEach(x=>{if(x.r!=null){rn+=x.w*x.r;rd+=x.w;}});return{s,arr,w,r:rd?rn/rd:null};}).sort((a,b)=>(b.r==null?-1e9:b.r)-(a.r==null?-1e9:a.r));
   const rmax=Math.max(...posSecs.map(x=>Math.abs(x.r||0)),1);
-  const chart=posSecs.map(sec=>{const r=sec.r,up=r!=null&&r>=0,h=r!=null?Math.abs(r)/rmax*100:0;return `<div class="trsb-col" title="${sec.s} · %${sec.w.toFixed(1)} ağırlık"><div class="trsb-val ${r>0?'trr-up':(r<0?'trr-dn':'')}">${r!=null?(r>0?'+':'')+r.toFixed(0):''}</div><div class="trsb-up"><i style="height:${up?h.toFixed(0):0}%;background:var(--good)"></i></div><div class="trsb-mid"></div><div class="trsb-dn"><i style="height:${(!up&&r!=null)?h.toFixed(0):0}%;background:var(--bad)"></i></div><div class="trsb-lbl">${sec.s}</div></div>`;}).join("");
-  const posCards=posSecs.map(sec=>{const chips=sec.arr.map(x=>`<div class="trp-row"><span class="trp-tk">${x.tk}</span><span class="trp-wv">%${x.w.toFixed(1)}</span><span class="trp-rv">${trRet(x.r)}</span></div>`).join("");return `<div class="trp-card"><div class="trp-ret">${trRet(sec.r)}</div><div class="trp-name">${sec.s}</div><div class="trp-subw">%${sec.w.toFixed(1)} ağırlık · ${sec.arr.length} hisse</div><div class="trp-rows">${chips}</div></div>`;}).join("");
+  const posCards=posSecs.map(sec=>{const chips=sec.arr.map(x=>`<div class="trp-row"><span class="trp-tk">${x.tk}</span><span class="trp-wv">%${x.w.toFixed(1)}</span><span class="trp-rv">${trRet(x.r)}</span></div>`).join("");const bw=(Math.abs(sec.r||0)/rmax*100).toFixed(0);return `<div class="trp-card"><div class="trp-ret">${trRet(sec.r)}</div><div class="trp-name">${sec.s}</div><div class="trp-subw">%${sec.w.toFixed(1)} ağırlık · ${sec.arr.length} hisse</div><div class="trp-scale"><i style="width:${bw}%;background:${(sec.r||0)>=0?'var(--good)':'var(--bad)'}"></i></div><div class="trp-rows">${chips}</div></div>`;}).join("");
   const perBtns=['d','w','m'].map(p=>`<button class="trp-pbtn${trFundPeriod===p?' on':''}" data-per="${p}">${p==='d'?'1G':p==='w'?'1H':'1A'}</button>`).join('');
   const uni=new Set(trAllStocks());
   const missing=d.equities.filter(e=>(e.market==="TR"||!e.market)&&!uni.has(e.ticker)).map(e=>e.ticker);
@@ -2894,7 +2896,6 @@ function renderTRFund(){
     </div></div>
     ${bondHtml}
     <div class="trr-card" style="margin-top:14px"><div class="trr-h" style="display:flex;align-items:center">Sektör Bazında <span class="trr-sub" style="margin-left:6px">(${d.equities.length} hisse${unc>0?` · sınıfsız %${unc.toFixed(1)}`:''})</span><span class="trp-per">${perBtns}</span></div>
-      <div class="trsb-chart">${chart}</div>
       <div class="trp-grid">${posCards}</div></div>
     <div class="trr-grid" style="margin-top:14px">
       <div class="trr-card"><div class="trr-h">🟢 En çok kazandıran <span class="trr-sub">(1 hafta · katkı puanı)</span></div>${ci(win)}</div>
