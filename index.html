@@ -654,6 +654,7 @@
     <button class="btn primary" id="reportsBtn" title="Raporlar">📄 Raporlar</button>
     <button class="btn primary" id="fonBtn" title="BVV / BTK fon portföyü">💼 Fon Portföyü</button>
     <button class="btn primary" id="akisBtn" title="ETF fon akışı — sektöre para giriş/çıkışı">💧 Fon Akışı</button>
+    <button class="btn primary" id="shortBtn" title="Short Radar — short interest azalan/artan, kadran ve sektörel">🎯 Short Radar</button>
     <button class="btn" id="exportBtn" title="Verini JSON olarak indir (yedek)">↧ Yedek al</button>
     <button class="btn" id="importBtn" title="JSON yedeği yükle">↥ İçe aktar</button>
     <button class="btn ghost" id="themeBtn" title="Açık / koyu tema">🌙</button>
@@ -725,6 +726,58 @@
     <div class="sheet-body" id="akisBody"></div>
   </div>
 </div>
+
+<div class="modal" id="shortModal" hidden>
+  <div class="modal-bg" data-close="short"></div>
+  <div class="modal-card big">
+    <button class="modal-x" data-close="short" title="Kapat">✕</button>
+    <div class="sheet-head">
+      <h3>🎯 Short Radar</h3>
+      <div class="sr-controls">
+        <div class="sr-tabs">
+          <button class="tr-tab active" data-srtab="kadran">Kadran</button>
+          <button class="tr-tab" data-srtab="tablo">Tablo</button>
+          <button class="tr-tab" data-srtab="sektor">Sektörel</button>
+        </div>
+        <div class="sr-wins">
+          <button class="rbtn" data-srwin="2h">2 Hafta</button>
+          <button class="rbtn on" data-srwin="1a">1 Ay</button>
+          <button class="rbtn" data-srwin="3a">3 Ay</button>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-body" id="shortBody"></div>
+  </div>
+</div>
+
+<style>
+.sr-controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.sr-tabs{display:flex;gap:6px}
+.sr-wins{display:flex;gap:4px}
+.sr-quad-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+#srQuad{width:100%;max-width:560px;height:auto;aspect-ratio:1/1;background:rgba(0,0,0,.18);border:1px solid var(--line-cool);border-radius:12px;cursor:pointer;display:block}
+:root[data-theme="light"] #srQuad{background:rgba(87,79,58,.05)}
+.sr-quad-hint{font-size:11px;color:var(--faint);text-align:center;max-width:560px}
+.sr-cols{display:flex;gap:16px;flex-wrap:wrap}
+.sr-col{flex:1;min-width:290px}
+.sr-col h4{margin:0 0 8px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+.sr-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12px}
+.sr-row:hover{background:var(--surface-2)}
+.sr-row .sr-tk{font-family:var(--mono);font-weight:700;width:56px;flex:none}
+.sr-row .sr-nm{color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-row .sr-d{font-family:var(--mono);width:50px;text-align:right;flex:none}
+.sr-row canvas{width:50px;height:20px;flex:none}
+table.sr-tbl{border-collapse:separate;border-spacing:0;font-size:12px;width:100%}
+table.sr-tbl th,table.sr-tbl td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.sr-tbl thead th{position:sticky;top:0;background:var(--surface-2);color:var(--muted);cursor:pointer;font-weight:600;z-index:2}
+table.sr-tbl td.l,table.sr-tbl th.l{text-align:left}
+table.sr-tbl td.tk{font-family:var(--mono);font-weight:700}
+table.sr-tbl tbody tr{cursor:pointer}
+table.sr-tbl tbody tr:hover{background:var(--surface-2)}
+.sr-tbl-wrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid var(--line);border-radius:10px}
+.sr-empty{color:var(--faint);text-align:center;padding:40px 10px;font-size:13px}
+.sr-th-on::after{content:" ▾";color:var(--accent)}
+</style>
 
 <style>
 .tr-sheet{position:fixed;inset:0;z-index:86;background:var(--ground);display:flex;flex-direction:column}
@@ -1211,7 +1264,7 @@ function startGitPoll(){
       const ac=await ghLatestCommit(GH.akisFile);
       if(ac&&ac!==akisCommit){await ghLoadAkis();if(!document.getElementById("akisModal").hidden)renderAkis();flash("Fon akışı güncellendi");}
       const sc=await ghLatestCommit(GH.shortFile);
-      if(sc&&sc!==shortCommit){await ghLoadShort();if(!document.getElementById("chartModal").hidden)renderChart();flash("Short interest güncellendi");}
+      if(sc&&sc!==shortCommit){await ghLoadShort();if(!document.getElementById("chartModal").hidden)renderChart();if(!document.getElementById("shortModal").hidden)renderShort();flash("Short interest güncellendi");}
       for(const f in GH.raporFiles){const c=await ghLatestCommit(GH.raporFiles[f]);if(c&&c!==trRaporCommits[f]){await ghLoadTRRapor();if(!document.getElementById("trSheet").hidden&&trTab==="fund")renderTRFund();flash(f+" raporu güncellendi");break;}}
       const thc=await ghLatestCommit(GH.trHisseFile);
       if(thc&&thc!==trHisseCommit){await ghLoadTRHisse();}
@@ -2716,6 +2769,144 @@ function renderTarama(){
 /* ---------- Fon Akışı (ETF giriş/çıkış) ---------- */
 function openAkis(){document.getElementById("akisModal").hidden=false;renderAkis();if(!akisData&&ghReady())ghLoadAkis().then(()=>{if(!document.getElementById("akisModal").hidden)renderAkis();}).catch(()=>{});}
 function closeAkis(){document.getElementById("akisModal").hidden=true;}
+
+/* ---------- Short Radar (short-interest.json) ---------- */
+let shortRadar={tab:"kadran",win:"1a",sort:{key:"shortPct",dir:"asc"}};
+const RADAR_WIN={"2h":14,"1a":30,"3a":90};
+let _srQuadDots=[];
+const SR_GREEN="#2E8B57",SR_RED="#C0392B",SR_AMBER="#E8A33D",SR_GRAY="#7f8896";
+function srName(t){for(const s of state.sectors){const c=s.companies.find(c=>c.ticker.toUpperCase()===t.toUpperCase());if(c)return c.name||"";}return "";}
+function srSector(t){for(const s of state.sectors){if(s.companies.find(c=>c.ticker.toUpperCase()===t.toUpperCase()))return s.name||"";}return "";}
+function srNearestIdx(dates,targetMs){let best=null,bd=Infinity;for(let i=0;i<dates.length;i++){const d=Math.abs(new Date(dates[i]).getTime()-targetMs);if(d<bd){bd=d;best=i;}}return best;}
+// Bir hisse için seçili pencerede short/fiyat metrikleri
+function srMetrics(ticker,days){
+  const it=shortItemOf(ticker);if(!it||!it.series)return null;
+  const s=it.series.filter(p=>p.short!=null);
+  if(s.length<2)return null;
+  const last=s[s.length-1];
+  if(last.short<1e6)return null;                       // gürültü filtresi (<1mn adet)
+  const targetT=new Date(last.d).getTime()-days*86400000;
+  let base=s[0],bd=Infinity;
+  for(let i=0;i<s.length-1;i++){const d=Math.abs(new Date(s[i].d).getTime()-targetT);if(d<bd){bd=d;base=s[i];}}
+  if(base.d===last.d||!base.short)return null;
+  const shortPct=(last.short-base.short)/base.short*100;
+  let pricePct=null;const q=quoteOf(ticker);const h=histOf(ticker);
+  if(h&&h.d&&h.c){const ie=srNearestIdx(h.d,new Date(last.d).getTime()),ib=srNearestIdx(h.d,new Date(base.d).getTime());
+    if(ie!=null&&ib!=null&&h.c[ib])pricePct=(h.c[ie]-h.c[ib])/h.c[ib]*100;}
+  const vals=s.map(p=>p.short).slice().sort((a,b)=>a-b);
+  const pctPos=Math.round(vals.filter(v=>v<=last.short).length/vals.length*100);
+  const px=(q&&q.price)?q.price:null;
+  return {ticker,name:srName(ticker),sector:srSector(ticker),curShort:last.short,baseShort:base.short,
+    dtc:last.dtc,shortPct,pricePct,pctPos,price:px,shortUsd:(px?last.short*px:null),series:s};
+}
+function srAll(days){const seen=new Set(),out=[];for(const s of state.sectors)for(const c of s.companies){const t=c.ticker.toUpperCase();if(seen.has(t))continue;seen.add(t);const m=srMetrics(t,days);if(m)out.push(m);}return out;}
+function srSectors(days){const out=[];for(const sec of state.sectors){let usd=0,dtcSum=0,dtcN=0,cur=0,base=0,n=0;
+  for(const c of sec.companies){const m=srMetrics(c.ticker,days);if(!m)continue;n++;if(m.shortUsd!=null)usd+=m.shortUsd;if(m.dtc!=null){dtcSum+=m.dtc;dtcN++;}cur+=m.curShort;base+=m.baseShort;}
+  if(n)out.push({sector:sec.name,shortUsd:usd,dtc:dtcN?dtcSum/dtcN:null,deltaPct:base?(cur-base)/base*100:null,n});}return out;}
+function srFmtUsd(v){if(v>=1e9)return (v/1e9).toFixed(1)+"B";if(v>=1e6)return (v/1e6).toFixed(0)+"mn";return v.toFixed(0);}
+function openShort(){document.getElementById("shortModal").hidden=false;renderShort();if((!shortData)&&ghReady())ghLoadShort().then(()=>{if(!document.getElementById("shortModal").hidden)renderShort();}).catch(()=>{});}
+function closeShort(){document.getElementById("shortModal").hidden=true;}
+function renderShort(){
+  document.querySelectorAll('#shortModal [data-srtab]').forEach(b=>b.classList.toggle("active",b.dataset.srtab===shortRadar.tab));
+  document.querySelectorAll('#shortModal [data-srwin]').forEach(b=>b.classList.toggle("on",b.dataset.srwin===shortRadar.win));
+  const body=document.getElementById("shortBody");
+  if(!shortData||!shortData.items){body.innerHTML='<div class="sr-empty">Short verisi henüz yok. Workflow çalıştıktan sonra görünür.</div>';return;}
+  const days=RADAR_WIN[shortRadar.win]||30;
+  const rows=srAll(days);
+  if(!rows.length){body.innerHTML='<div class="sr-empty">Bu pencerede yeterli veri yok (geçmiş kısa olabilir).</div>';return;}
+  if(shortRadar.tab==="kadran")srRenderKadran(body,rows);
+  else if(shortRadar.tab==="tablo")srRenderTablo(body,rows);
+  else srRenderSektor(body,days);
+}
+function srRenderKadran(body,rows){
+  body.innerHTML=`<div class="sr-quad-wrap"><canvas id="srQuad" width="560" height="560"></canvas>
+    <div class="sr-quad-hint">Yatay eksen: short Δ% · Dikey eksen: fiyat Δ% (${shortRadar.win}). Nokta = hisse, tıkla → grafik açılır.</div></div>
+    <div class="sr-cols" style="margin-top:14px">
+      <div class="sr-col"><h4><span style="color:${SR_GREEN}">↓</span> Azalanlar <span style="color:var(--faint);font-weight:400">· short covering</span></h4><div id="srDown"></div></div>
+      <div class="sr-col"><h4><span style="color:${SR_RED}">↑</span> Artanlar <span style="color:var(--faint);font-weight:400">· short building</span></h4><div id="srUp"></div></div>
+    </div>`;
+  const cv=document.getElementById("srQuad");srDrawQuad(cv,rows);
+  cv.onclick=(e)=>{const r=cv.getBoundingClientRect();const sx=cv.width/r.width,sy=cv.height/r.height;
+    const mx=(e.clientX-r.left)*sx,my=(e.clientY-r.top)*sy;let best=null,bd=Infinity;
+    for(const d of _srQuadDots){const dist=(d.x-mx)**2+(d.y-my)**2;if(dist<bd){bd=dist;best=d;}}
+    if(best&&bd<500){closeShort();openChart(best.ticker);}};
+  const byShort=rows.filter(m=>m.shortPct!=null).slice().sort((a,b)=>a.shortPct-b.shortPct);
+  srFillList(document.getElementById("srDown"),byShort.slice(0,15));
+  srFillList(document.getElementById("srUp"),byShort.slice(-15).reverse());
+}
+function srFillList(el,list){
+  el.innerHTML="";
+  if(!list.length){el.innerHTML='<div class="sr-empty" style="padding:16px">—</div>';return;}
+  list.forEach(m=>{
+    const row=document.createElement("div");row.className="sr-row";
+    row.innerHTML=`<span class="sr-tk">${esc(m.ticker)}</span><span class="sr-nm">${esc(m.name)}</span>
+      <span class="sr-d" style="color:${m.shortPct<0?SR_GREEN:SR_RED}">${m.shortPct>0?'+':''}${m.shortPct.toFixed(0)}%</span>
+      <span class="sr-d" style="color:${m.pricePct==null?'var(--faint)':(m.pricePct>=0?SR_GREEN:SR_RED)}">${m.pricePct==null?'—':(m.pricePct>0?'+':'')+m.pricePct.toFixed(0)+'%'}</span>
+      <canvas width="50" height="20"></canvas>`;
+    row.onclick=()=>{closeShort();openChart(m.ticker);};el.appendChild(row);
+    drawSeries(row.querySelector("canvas"),m.series.map(p=>p.short),{lw:1.3,pad:2,color:m.shortPct<0?SR_GREEN:SR_RED});
+  });
+}
+function srDrawQuad(cv,rows){
+  const ctx=cv.getContext("2d");const W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
+  const pad=40,cap=50;
+  const cx=x=>pad+(Math.max(-cap,Math.min(cap,x))+cap)/(2*cap)*(W-2*pad);
+  const cy=y=>pad+(1-(Math.max(-cap,Math.min(cap,y))+cap)/(2*cap))*(H-2*pad);
+  const x0=cx(0),y0=cy(0);
+  ctx.fillStyle=hexA(SR_GREEN,.07);ctx.fillRect(pad,pad,x0-pad,y0-pad);
+  ctx.fillStyle=hexA(SR_AMBER,.07);ctx.fillRect(x0,pad,W-pad-x0,y0-pad);
+  ctx.fillStyle=hexA(SR_GRAY,.07);ctx.fillRect(pad,y0,x0-pad,H-pad-y0);
+  ctx.fillStyle=hexA(SR_RED,.07);ctx.fillRect(x0,y0,W-pad-x0,H-pad-y0);
+  ctx.strokeStyle=gridCol(true);ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad,y0);ctx.lineTo(W-pad,y0);ctx.moveTo(x0,pad);ctx.lineTo(x0,H-pad);ctx.stroke();
+  ctx.font="11px ui-monospace,Consolas,monospace";
+  ctx.fillStyle=hexA(SR_GREEN,.95);ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText("↓Short ↑Fiyat · covering rally",pad+5,pad+5);
+  ctx.fillStyle=hexA(SR_AMBER,.95);ctx.textAlign="right";ctx.fillText("↑Short ↑Fiyat · squeeze/kalabalık",W-pad-5,pad+5);
+  ctx.fillStyle=hexA(SR_GRAY,.95);ctx.textAlign="left";ctx.textBaseline="bottom";ctx.fillText("↓Short ↓Fiyat · kapitülasyon",pad+5,H-pad-5);
+  ctx.fillStyle=hexA(SR_RED,.95);ctx.textAlign="right";ctx.fillText("↑Short ↓Fiyat · ayılar hâkim",W-pad-5,H-pad-5);
+  _srQuadDots=[];
+  for(const m of rows){if(m.shortPct==null||m.pricePct==null)continue;
+    const x=cx(m.shortPct),y=cy(m.pricePct);
+    const col=(m.shortPct<0)?(m.pricePct>=0?SR_GREEN:SR_GRAY):(m.pricePct>=0?SR_AMBER:SR_RED);
+    ctx.fillStyle=hexA(col,.85);ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+    _srQuadDots.push({x,y,ticker:m.ticker});}
+}
+function srRenderTablo(body,rows){
+  const cols=[["ticker","Ticker","l"],["sector","Sektör","l"],["curShort","Short (mn)",""],["shortPct","Short Δ%",""],["pricePct","Fiyat Δ%",""],["dtc","Gün-örtü",""],["pctPos","18-ay %",""]];
+  const sk=shortRadar.sort.key,dir=shortRadar.sort.dir==="asc"?1:-1;
+  const sorted=rows.slice().sort((a,b)=>{let va=a[sk],vb=b[sk];
+    if(sk==="ticker"||sk==="sector"){va=va||"";vb=vb||"";return va<vb?-dir:va>vb?dir:0;}
+    if(va==null)return 1;if(vb==null)return -1;return (va-vb)*dir;});
+  const th=cols.map(c=>`<th class="${c[2]} ${sk===c[0]?'sr-th-on':''}" data-k="${c[0]}">${c[1]}</th>`).join("");
+  const trs=sorted.map(m=>`<tr data-tk="${esc(m.ticker)}">
+    <td class="l tk">${esc(m.ticker)}</td><td class="l" style="color:var(--muted)">${esc(m.sector)}</td>
+    <td>${(m.curShort/1e6).toFixed(1)}</td>
+    <td style="color:${m.shortPct<0?SR_GREEN:SR_RED}">${m.shortPct>0?'+':''}${m.shortPct.toFixed(1)}%</td>
+    <td style="color:${m.pricePct==null?'var(--faint)':(m.pricePct>=0?SR_GREEN:SR_RED)}">${m.pricePct==null?'—':(m.pricePct>0?'+':'')+m.pricePct.toFixed(1)+'%'}</td>
+    <td>${m.dtc==null?'—':m.dtc.toFixed(1)}</td><td>${m.pctPos}%</td></tr>`).join("");
+  body.innerHTML=`<div class="sr-tbl-wrap"><table class="sr-tbl"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
+  body.querySelectorAll("th[data-k]").forEach(h=>h.onclick=()=>{const k=h.dataset.k;
+    if(shortRadar.sort.key===k)shortRadar.sort.dir=shortRadar.sort.dir==="asc"?"desc":"asc";
+    else{shortRadar.sort.key=k;shortRadar.sort.dir=(k==="ticker"||k==="sector")?"asc":"desc";}renderShort();});
+  body.querySelectorAll("tbody tr").forEach(tr=>tr.onclick=()=>{closeShort();openChart(tr.dataset.tk);});
+}
+function srRenderSektor(body,days){
+  const secs=srSectors(days).filter(s=>s.shortUsd>0).sort((a,b)=>b.shortUsd-a.shortUsd);
+  if(!secs.length){body.innerHTML='<div class="sr-empty">Sektörel short $ verisi yok (fiyat verisi gerekli).</div>';return;}
+  const max=Math.max(...secs.map(s=>s.shortUsd));
+  const rows=secs.map(s=>{const w=Math.round(s.shortUsd/max*100);
+    return `<tr><td class="l">${esc(s.sector)}</td>
+      <td><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+        <div style="flex:1;max-width:170px;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden"><div style="width:${w}%;height:100%;background:${SR_RED}"></div></div>
+        <b>$${srFmtUsd(s.shortUsd)}</b></div></td>
+      <td>${s.dtc==null?'—':s.dtc.toFixed(1)}</td>
+      <td style="color:${s.deltaPct==null?'var(--faint)':(s.deltaPct<0?SR_GREEN:SR_RED)}">${s.deltaPct==null?'—':(s.deltaPct>0?'+':'')+s.deltaPct.toFixed(1)+'%'}</td>
+      <td>${s.n}</td></tr>`;}).join("");
+  body.innerHTML=`<div class="sr-tbl-wrap"><table class="sr-tbl"><thead><tr>
+    <th class="l">Sektör</th><th>Short $ değeri</th><th>Ort. gün-örtü</th><th>Sektör short Δ%</th><th>Hisse</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="sr-quad-hint" style="margin-top:8px;text-align:left">Short $ değeri = Σ(short adet × fiyat). Yalnız short verisi olan ABD hisseleri; hepsi USD.</div>`;
+}
 function fmtFlow(v){if(v==null)return "—";const s=v<0?"−":"+";const a=Math.abs(v);let n;if(a>=1e9)n="$"+(a/1e9).toFixed(2)+"B";else if(a>=1e6)n="$"+(a/1e6).toFixed(0)+"M";else if(a>=1e3)n="$"+(a/1e3).toFixed(0)+"K";else n="$"+Math.round(a);return s+n;}
 function wireAkisCtrls(){document.querySelectorAll("#akisBody [data-aw]").forEach(b=>b.onclick=()=>{akisWin=b.dataset.aw;renderAkis();});}
 function drawAkisSparks(){
@@ -3239,6 +3430,9 @@ document.getElementById("newsBtn").onclick=()=>openNews("");
 document.getElementById("reportsBtn").onclick=openReports;
 document.getElementById("fonBtn").onclick=openFon;
 document.getElementById("akisBtn").onclick=openAkis;
+document.getElementById("shortBtn").onclick=openShort;
+document.querySelectorAll('#shortModal [data-srtab]').forEach(b=>b.onclick=()=>{shortRadar.tab=b.dataset.srtab;renderShort();});
+document.querySelectorAll('#shortModal [data-srwin]').forEach(b=>b.onclick=()=>{shortRadar.win=b.dataset.srwin;renderShort();});
 document.getElementById("fonPrintBtn").onclick=fonPrintSummary;
 document.getElementById("fonPassGo").onclick=tryFonPass;
 document.getElementById("fonPass").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryFonPass();}});
@@ -3263,17 +3457,18 @@ document.querySelectorAll('[data-close="regime"]').forEach(el=>el.onclick=closeR
 document.querySelectorAll('[data-close="fon"]').forEach(el=>el.onclick=closeFon);
 document.querySelectorAll('[data-close="tarama"]').forEach(el=>el.onclick=closeTarama);
 document.querySelectorAll('[data-close="akis"]').forEach(el=>el.onclick=closeAkis);
+document.querySelectorAll('[data-close="short"]').forEach(el=>el.onclick=closeShort);
 document.querySelectorAll('[data-close="tr"]').forEach(el=>el.onclick=closeTR);
 document.querySelectorAll('[data-close="trd"]').forEach(el=>el.onclick=closeTRDetail);
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("regimeModal").hidden)closeRegimeModal();});
-document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();else if(!document.getElementById("trDetail").hidden)closeTRDetail();else if(!document.getElementById("trSheet").hidden)closeTR();});
+document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!document.getElementById("newsModal").hidden)closeNews();else if(!document.getElementById("reportsModal").hidden)closeReports();else if(!document.getElementById("fonModal").hidden)closeFon();else if(!document.getElementById("taramaModal").hidden)closeTarama();else if(!document.getElementById("akisModal").hidden)closeAkis();else if(!document.getElementById("shortModal").hidden)closeShort();else if(!document.getElementById("trDetail").hidden)closeTRDetail();else if(!document.getElementById("trSheet").hidden)closeTR();});
 
 /* ---------- startup ---------- */
 async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();await ghLoadShort();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
