@@ -751,23 +751,18 @@
   </div>
 </div>
 
-<div class="modal" id="optModal" hidden>
-  <div class="modal-bg" data-close="opt"></div>
-  <div class="modal-card big">
-    <button class="modal-x" data-close="opt" title="Kapat">✕</button>
-    <div class="sheet-head">
-      <h3>📊 Option Screener <span class="opt-scope">ABD</span></h3>
-      <div class="opt-controls">
-        <div class="search opt-search"><span>⌕</span><input id="optSearch" type="text" placeholder="Ticker / sektör" aria-label="Ara" /></div>
-        <span id="optUpd" class="opt-upd"></span>
-      </div>
-    </div>
-    <div class="opt-legend" id="optLegend"></div>
-    <div class="sheet-body" id="optBody"></div>
+<div class="opt-sheet" id="optSheet" hidden>
+  <div class="opt-bar">
+    <span class="opt-title">📊 Option Screener <span class="opt-scope">ABD</span></span>
+    <div class="search opt-search"><span>⌕</span><input id="optSearch" type="text" placeholder="Ticker / sektör ara" aria-label="Ara" /></div>
+    <span id="optUpd" class="opt-upd"></span>
+    <button class="btn ghost sm" data-close="opt" title="ABD tarafına dön" style="margin-left:auto">✕ Kapat</button>
   </div>
+  <div class="opt-legend" id="optLegend"></div>
+  <div class="opt-body" id="optBody"></div>
 </div>
 
-<div class="modal" id="optDetailModal" hidden>
+<div class="modal" id="optDetailModal" hidden style="z-index:95">
   <div class="modal-bg" data-close="optd"></div>
   <div class="modal-card">
     <button class="modal-x" data-close="optd" title="Kapat">✕</button>
@@ -776,11 +771,16 @@
 </div>
 
 <style>
+.opt-sheet{position:fixed;inset:0;z-index:86;background:var(--ground);display:flex;flex-direction:column}
+.opt-sheet[hidden]{display:none}
+.opt-bar{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface);width:100%;min-height:54px;flex:0 0 auto;box-sizing:border-box;flex-wrap:wrap}
+.opt-title{font-weight:700;font-size:15px;color:var(--text);white-space:nowrap}
+.opt-body{flex:1;overflow:auto;padding:6px 16px 24px}
 .opt-scope{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--accent);border:1px solid var(--line-cool);border-radius:20px;padding:1px 8px;vertical-align:middle;margin-left:6px}
 .opt-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-left:auto}
 .opt-search{min-width:200px}
 .opt-upd{font-family:var(--mono);font-size:11px;color:var(--faint)}
-.opt-legend{font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;gap:18px;flex-wrap:wrap;padding:4px 2px 10px}
+.opt-legend{font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;gap:18px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--line-cool);flex:0 0 auto}
 .opt-legend b{color:var(--muted);font-weight:600}
 .opt-sec-h{display:flex;align-items:baseline;gap:10px;margin:16px 0 4px}
 .opt-sec-h .idx{font-family:var(--mono);font-size:11px;color:var(--accent);opacity:.7}
@@ -1333,7 +1333,7 @@ function startGitPoll(){
       const sc=await ghLatestCommit(GH.shortFile);
       if(sc&&sc!==shortCommit){await ghLoadShort();if(!document.getElementById("chartModal").hidden)renderChart();if(!document.getElementById("shortModal").hidden)renderShort();flash("Short interest güncellendi");}
       const oc=await ghLatestCommit(GH.optionFile);
-      if(oc&&oc!==optCommit){await ghLoadOption();if(!document.getElementById("optModal").hidden)renderOpt();flash("Opsiyon taraması güncellendi");}
+      if(oc&&oc!==optCommit){await ghLoadOption();if(!document.getElementById("optSheet").hidden)renderOpt();flash("Opsiyon taraması güncellendi");}
       for(const f in GH.raporFiles){const c=await ghLatestCommit(GH.raporFiles[f]);if(c&&c!==trRaporCommits[f]){await ghLoadTRRapor();if(!document.getElementById("trSheet").hidden&&trTab==="fund")renderTRFund();flash(f+" raporu güncellendi");break;}}
       const thc=await ghLatestCommit(GH.trHisseFile);
       if(thc&&thc!==trHisseCommit){await ghLoadTRHisse();}
@@ -3525,8 +3525,8 @@ function optCmp(a,b,dir){const an=(a==null||(typeof a==="number"&&isNaN(a))),bn=
 function optSetSort(k){if(optSort.key===k)optSort.dir*=-1;else optSort={key:k,dir:(k==="tk"?1:-1)};renderOpt();}
 const OPT_COLS=[["tk","Hisse","l"],["spot","Spot",""],["pcOI","P/C OI",""],["pcVol","P/C Vol",""],["ivAvg","IV",""],["skew","Skew",""],["maxPain","MaxPain",""],["instPct","Kurum%",""],["insider","Ins net",""],["dtc","DTC",""],["score","Sinyal",""]];
 
-function openOpt(){document.getElementById("optModal").hidden=false;renderOpt();if((!optData)&&ghReady())ghLoadOption().then(()=>{if(!document.getElementById("optModal").hidden)renderOpt();}).catch(()=>{});}
-function closeOpt(){document.getElementById("optModal").hidden=true;}
+function openOpt(){document.getElementById("optSheet").hidden=false;renderOpt();if((!optData)&&ghReady())ghLoadOption().then(()=>{if(!document.getElementById("optSheet").hidden)renderOpt();}).catch(()=>{});}
+function closeOpt(){document.getElementById("optSheet").hidden=true;}
 function optOiBar(o){const c=(o&&o.callOI)||0,p=(o&&o.putOI)||0,t=c+p;if(!t)return `<span class="opt-oibar"></span>`;
   const cp=Math.round(c/t*100);return `<span class="opt-oibar" title="call ${oNum(c)} / put ${oNum(p)}"><i style="width:${cp}%;background:var(--good)"></i><i style="width:${100-cp}%;background:var(--bad)"></i></span>`;}
 function optRow(it){const o=it.options||{},w=it.ownership||{};const ins=oInsNet(w);
