@@ -759,12 +759,13 @@
     <button class="btn ghost sm" data-close="opt" title="ABD tarafına dön" style="margin-left:auto">✕ Kapat</button>
   </div>
   <div class="opt-legend" id="optLegend"></div>
+  <div class="opt-secbar" id="optSecBar"></div>
   <div class="opt-body" id="optBody"></div>
 </div>
 
 <div class="modal" id="optDetailModal" hidden style="z-index:95">
   <div class="modal-bg" data-close="optd"></div>
-  <div class="modal-card">
+  <div class="modal-card big" style="width:min(1040px,95vw)">
     <button class="modal-x" data-close="optd" title="Kapat">✕</button>
     <div id="optDetailBody"></div>
   </div>
@@ -781,6 +782,18 @@
 .opt-search{min-width:200px}
 .opt-upd{font-family:var(--mono);font-size:11px;color:var(--faint)}
 .opt-legend{font-family:var(--mono);font-size:11px;color:var(--faint);display:flex;gap:18px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--line-cool);flex:0 0 auto}
+.opt-secbar{display:flex;gap:6px;flex-wrap:wrap;padding:9px 16px;border-bottom:1px solid var(--line);flex:0 0 auto;background:var(--surface)}
+.opt-chip{background:transparent;border:1px solid var(--line-cool);color:var(--muted);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap;font-family:var(--sans)}
+.opt-chip:hover{color:var(--text);border-color:var(--accent-2)}
+.opt-chip.on{color:var(--accent);border-color:var(--accent);background:rgba(233,165,60,.08);font-weight:600}
+.opt-chip .c{font-family:var(--mono);font-size:10px;color:var(--faint);margin-left:5px}
+.opt-chip.on .c{color:var(--accent)}
+.od-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;align-items:start;margin-top:12px}
+.od-block{border:1px solid var(--line-cool);border-radius:10px;padding:10px 12px;background:rgba(0,0,0,.10)}
+:root[data-theme="light"] .od-block{background:rgba(87,79,58,.04)}
+.od-block .od-sect{margin-top:0}
+.od-spark-t{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:10px 0 4px}
+#optDetailBody{overflow:auto;flex:1;min-height:0;width:100%}
 .opt-legend b{color:var(--muted);font-weight:600}
 .opt-sec-h{display:flex;align-items:baseline;gap:10px;margin:16px 0 4px}
 .opt-sec-h .idx{font-family:var(--mono);font-size:11px;color:var(--accent);opacity:.7}
@@ -3504,7 +3517,7 @@ document.querySelectorAll('#shortModal [data-srtab]').forEach(b=>b.onclick=()=>{
 document.querySelectorAll('#shortModal [data-srwin]').forEach(b=>b.onclick=()=>{shortRadar.win=b.dataset.srwin;renderShort();});
 
 /* ================= Option Screener (option-screening.json) ================= */
-let optSort={key:"pcOI",dir:1}, optQ="";
+let optSort={key:"pcOI",dir:1}, optQ="", optSectorFilter="";
 function oNum(n){if(n==null||isNaN(n))return "—";const a=Math.abs(n);if(a>=1e9)return (n/1e9).toFixed(2)+"B";if(a>=1e6)return (n/1e6).toFixed(2)+"M";if(a>=1e3)return (n/1e3).toFixed(1)+"K";return String(Math.round(n));}
 function oF(n,d){return (n==null||isNaN(n))?"—":(+n).toFixed(d==null?2:d);}
 function oPct(n,d){return (n==null||isNaN(n))?"—":(+n).toFixed(d==null?1:d)+"%";}
@@ -3551,7 +3564,7 @@ function renderOpt(){
   if(leg)leg.innerHTML=`<span><b>P/C OI</b> put/call açık pozisyon — düşük=boğa, yüksek=ayı</span><span><b>Skew</b> put−call IV (poz.=koruma talebi)</span><span><b>MaxPain</b> yazıcı baskı seviyesi</span><span><b>Ins net</b> insider 6a net · <b>DTC</b> days-to-cover</span><span>Satıra tıkla → detay</span>`;
   const body=document.getElementById("optBody");if(!body)return;
   if(!optData||!optData.items||!Object.keys(optData.items).length){
-    body.innerHTML='<div class="sr-empty">Opsiyon tarama verisi henüz yok. "Option Screening Güncelle" workflow\'u çalıştıktan sonra görünür (ABD hisseleri).</div>';return;}
+    body.innerHTML='<div class="sr-empty">Opsiyon tarama verisi henüz yok. "Option Screening Güncelle" workflow\'u çalıştıktan sonra görünür (ABD hisseleri).</div>';const _sb=document.getElementById("optSecBar");if(_sb)_sb.innerHTML="";return;}
   const items=Object.keys(optData.items).map(t=>Object.assign({__t:t},optData.items[t]));
   const q=(optQ||"").trim().toUpperCase();
   const filt=q?items.filter(it=>(it.__t+" "+(it.name||"")+" "+(it.sector||"")).toUpperCase().includes(q)):items;
@@ -3560,11 +3573,20 @@ function renderOpt(){
   const groups=new Map();
   filt.forEach(it=>{const s=it.sector||"Diğer";if(!groups.has(s))groups.set(s,[]);groups.get(s).push(it);});
   const secList=[...order.filter(s=>groups.has(s)),...[...groups.keys()].filter(s=>!seen.has(s)).sort()];
+  // üst sektör filtre çubuğu — sektöre tıkla, o sektör üstte tek başına gelsin
+  const secBar=document.getElementById("optSecBar");
+  if(secBar){
+    if(optSectorFilter&&!secList.includes(optSectorFilter))optSectorFilter="";
+    secBar.innerHTML=`<button class="opt-chip ${!optSectorFilter?'on':''}" data-sec="">Tümü <span class="c">${filt.length}</span></button>`+
+      secList.map(s=>`<button class="opt-chip ${optSectorFilter===s?'on':''}" data-sec="${esc(s)}">${esc(s)} <span class="c">${groups.get(s).length}</span></button>`).join("");
+    secBar.querySelectorAll(".opt-chip").forEach(b=>b.onclick=()=>{optSectorFilter=b.dataset.sec;renderOpt();const bd=document.getElementById("optBody");if(bd)bd.scrollTop=0;});
+  }
+  const showSecs=optSectorFilter?secList.filter(s=>s===optSectorFilter):secList;
   const dir=optSort.dir,key=optSort.key;
   const th=OPT_COLS.map(c=>`<th class="${c[2]} ${key===c[0]?'sr-th-on':''}" data-k="${c[0]}">${c[1]}</th>`).join("");
   let html="";
-  if(!secList.length)html='<div class="sr-empty">Aramaya uyan hisse yok.</div>';
-  secList.forEach((s,i)=>{
+  if(!showSecs.length)html='<div class="sr-empty">Aramaya uyan hisse yok.</div>';
+  showSecs.forEach((s,i)=>{
     const rows=groups.get(s).slice().sort((a,b)=>optCmp(optMetric(a,key),optMetric(b,key),dir));
     const idx=String((order.indexOf(s)>=0?order.indexOf(s):i)+1).padStart(2,"0");
     html+=`<div class="opt-sec-h"><span class="idx">${idx}</span><h4>${esc(s)}</h4><span class="cnt">${rows.length} hisse</span></div>
@@ -3584,38 +3606,42 @@ function openOptDetail(t){
   const ins=oInsNet(w);
   const reasons=(it.reasons&&it.reasons.length)?`<div class="od-reasons">${it.reasons.map(r=>`<div class="r">• ${esc(r)}</div>`).join("")}</div>`:"";
   const hist=(it.pcrHistory||[]).map(p=>p.pcOI).filter(v=>v!=null&&!isNaN(v));
-  const optBlock=(o&&(o.callOI||o.putOI))?`
-    <div class="od-grid">
-      ${odKpi("P/C OI",`<span class="${oPcCls(o.pcOI)}">${oF(o.pcOI)}</span>`)}
-      ${odKpi("P/C Hacim",`<span class="${oPcCls(o.pcVol)}">${oF(o.pcVol)}</span>`)}
-      ${odKpi("Call OI",oNum(o.callOI))}
-      ${odKpi("Put OI",oNum(o.putOI))}
-      ${odKpi("IV (call/put)",`${oIv(o.ivCall)} <small>/ ${oIv(o.ivPut)}</small>`)}
-      ${odKpi("IV Skew",o.skew==null?"—":(o.skew>0?"+":"")+oF(o.skew))}
-      ${odKpi("Max Pain",`${o.maxPain==null?"—":oF(o.maxPain)} ${it.spot?`<small>(spot ${oSpot(it.spot)})</small>`:""}`)}
-      ${odKpi("Vadeler",`<small>${(o.expiriesUsed||[]).join(", ")||"—"}</small>`)}
-    </div>
-    ${hist.length>1?`<div class="od-sect">P/C OI geçmişi</div><canvas id="odSpark" width="260" height="44" style="width:100%;max-width:320px"></canvas>`:""}
-    <div class="od-sect">En yüksek OI — Call ${o.repExp?`(${esc(o.repExp)})`:""}</div>${odStrikes(o.topCall,"opt-up")}
-    <div class="od-sect">En yüksek OI — Put</div>${odStrikes(o.topPut,"opt-dn")}
-    <div class="od-sect">Unusual akış (vol > OI)</div>${
-      (o.unusual&&o.unusual.length)?`<table class="od-tbl"><thead><tr><th class="l">Tip</th><th>Strike</th><th>OI</th><th>Hacim</th><th>V/OI</th></tr></thead><tbody>${
-        o.unusual.map(u=>`<tr><td class="l"><span class="${u.type==='C'?'opt-up':'opt-dn'}">${u.type==='C'?'CALL':'PUT'}</span></td><td>${oF(u.strike)}</td><td>${oNum(u.oi)}</td><td>${oNum(u.vol)}</td><td>${oF(u.volOi)}</td></tr>`).join("")}</tbody></table>`
-      :'<div class="od-none">Belirgin unusual akış yok.</div>'}`
-    :'<div class="od-none">Bu hisse için opsiyon zinciri verisi yok (yalnızca sahiplik verisi mevcut).</div>';
-  document.getElementById("optDetailBody").innerHTML=`
-    <div class="od-head"><span class="tk">${esc(t)}</span>${oSig(it.signal)}<span class="nm">${esc(it.name||"")}</span></div>
-    <div class="od-sub">${esc(it.sector||"")} · ${esc(it.asOf||"")}${it.spot?` · spot ${oSpot(it.spot)}`:""}</div>
-    ${reasons}
-    <div class="od-sect">Sahiplik & Insider</div>
+  const hasOpt=!!(o&&(o.callOI||o.putOI));
+  const ownBlock=`<div class="od-block"><div class="od-sect">Sahiplik & Insider</div>
     <div class="od-grid">
       ${odKpi("Kurumsal %",oPct(w.instPct))}
       ${odKpi("Insider %",oPct(w.insiderPct))}
       ${odKpi("Insider net (6a)",ins==null?"—":`<small>${ins>0?"+":""}</small>${oNum(ins)}`)}
       ${odKpi("Days to cover",oF(w.daysToCover,1))}
-    </div>
-    <div class="od-sect">Opsiyon</div>
-    ${optBlock}`;
+    </div></div>`;
+  let blocks=ownBlock;
+  if(hasOpt){
+    blocks+=`<div class="od-block"><div class="od-sect">Opsiyon özet</div>
+      <div class="od-grid">
+        ${odKpi("P/C OI",`<span class="${oPcCls(o.pcOI)}">${oF(o.pcOI)}</span>`)}
+        ${odKpi("P/C Hacim",`<span class="${oPcCls(o.pcVol)}">${oF(o.pcVol)}</span>`)}
+        ${odKpi("Call OI",oNum(o.callOI))}
+        ${odKpi("Put OI",oNum(o.putOI))}
+        ${odKpi("IV c/p",`${oIv(o.ivCall)} <small>/ ${oIv(o.ivPut)}</small>`)}
+        ${odKpi("IV Skew",o.skew==null?"—":(o.skew>0?"+":"")+oF(o.skew))}
+        ${odKpi("Max Pain",`${o.maxPain==null?"—":oF(o.maxPain)} ${it.spot?`<small>(${oSpot(it.spot)})</small>`:""}`)}
+        ${odKpi("Vadeler",`<small>${(o.expiriesUsed||[]).join(", ")||"—"}</small>`)}
+      </div>
+      ${hist.length>1?`<div class="od-spark-t">P/C OI geçmişi</div><canvas id="odSpark" width="260" height="40" style="width:100%"></canvas>`:""}</div>`;
+    blocks+=`<div class="od-block"><div class="od-sect">En yüksek OI — Call ${o.repExp?`(${esc(o.repExp)})`:""}</div>${odStrikes(o.topCall,"opt-up")}</div>`;
+    blocks+=`<div class="od-block"><div class="od-sect">En yüksek OI — Put</div>${odStrikes(o.topPut,"opt-dn")}</div>`;
+    blocks+=`<div class="od-block"><div class="od-sect">Unusual akış (vol > OI)</div>${
+      (o.unusual&&o.unusual.length)?`<table class="od-tbl"><thead><tr><th class="l">Tip</th><th>Strike</th><th>OI</th><th>Hacim</th><th>V/OI</th></tr></thead><tbody>${
+        o.unusual.map(u=>`<tr><td class="l"><span class="${u.type==='C'?'opt-up':'opt-dn'}">${u.type==='C'?'CALL':'PUT'}</span></td><td>${oF(u.strike)}</td><td>${oNum(u.oi)}</td><td>${oNum(u.vol)}</td><td>${oF(u.volOi)}</td></tr>`).join("")}</tbody></table>`
+      :'<div class="od-none">Belirgin unusual akış yok.</div>'}</div>`;
+  }else{
+    blocks+=`<div class="od-block"><div class="od-none">Bu hisse için opsiyon zinciri verisi yok (yalnızca sahiplik verisi mevcut).</div></div>`;
+  }
+  document.getElementById("optDetailBody").innerHTML=`
+    <div class="od-head"><span class="tk">${esc(t)}</span>${oSig(it.signal)}<span class="nm">${esc(it.name||"")}</span></div>
+    <div class="od-sub">${esc(it.sector||"")} · ${esc(it.asOf||"")}${it.spot?` · spot ${oSpot(it.spot)}`:""}</div>
+    ${reasons}
+    <div class="od-cols">${blocks}</div>`;
   document.getElementById("optDetailModal").hidden=false;
   if(hist.length>1){const cv=document.getElementById("odSpark");if(cv&&typeof drawSeries==="function")drawSeries(cv,hist,{lw:1.5,pad:3,color:"#6FA2CE"});}
 }
