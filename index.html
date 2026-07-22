@@ -794,6 +794,8 @@
 .od-block .od-sect{margin-top:0}
 .od-spark-t{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:10px 0 4px}
 #optDetailBody{overflow:auto;flex:1;min-height:0;width:100%}
+.opt-th-i{font-size:9px;color:var(--faint);margin-left:3px;opacity:.55;vertical-align:super;cursor:help}
+table.sr-tbl thead th:hover .opt-th-i{opacity:1;color:var(--accent-2)}
 .opt-legend b{color:var(--muted);font-weight:600}
 .opt-sec-h{display:flex;align-items:baseline;gap:10px;margin:16px 0 4px}
 .opt-sec-h .idx{font-family:var(--mono);font-size:11px;color:var(--accent);opacity:.7}
@@ -3536,7 +3538,19 @@ function optCmp(a,b,dir){const an=(a==null||(typeof a==="number"&&isNaN(a))),bn=
   if(an&&bn)return 0; if(an)return 1; if(bn)return -1;
   if(typeof a==="string")return dir*a.localeCompare(b); return dir*(a-b);}
 function optSetSort(k){if(optSort.key===k)optSort.dir*=-1;else optSort={key:k,dir:(k==="tk"?1:-1)};renderOpt();}
-const OPT_COLS=[["tk","Hisse","l"],["spot","Spot",""],["pcOI","P/C OI",""],["pcVol","P/C Vol",""],["ivAvg","IV",""],["skew","Skew",""],["maxPain","MaxPain",""],["instPct","Kurum%",""],["insider","Ins net",""],["dtc","DTC",""],["score","Sinyal",""]];
+const OPT_COLS=[
+  ["tk","Hisse","l","Hisse kodu ve şirket adı. Satıra tıkla → detay açılır. Başlığa tıkla → sırala."],
+  ["spot","Spot","","Güncel hisse fiyatı ($)."],
+  ["pcOI","P/C OI","","Put/Call açık pozisyon oranı = put OI ÷ call OI. Birikmiş konumlanma. <0.70 boğa (call ağırlıklı), >1.20 ayı (put ağırlıklı / korunma). Yanındaki çubuk: yeşil=call payı, kırmızı=put payı."],
+  ["pcVol","P/C Vol","","Put/Call hacim oranı — bugünkü taze aktivite (OI birikimden farklı, anlık duygu). Aynı okuma: düşük boğa, yüksek ayı."],
+  ["ivAvg","IV","","Örtük oynaklık — opsiyona gömülü beklenen hareket. Yüksek = pahalı opsiyon / belirsiz. Tek başına YÖN belirtmez."],
+  ["skew","Skew","","IV skew = put IV − call IV. Pozitif (>+0.05) = ayı (aşağı koruma talebi, put pahalı). Negatif (<−0.02) = boğa (call iştahı)."],
+  ["maxPain","MaxPain","","Max pain — opsiyon yazıcılarının en az ödediği strike. Fiyat vadeye doğru buraya çekilme eğiliminde (mıknatıs/pinning). Yön değil, hedef seviye."],
+  ["instPct","Kurum%","","Kurumsal sahiplik yüzdesi. Yüksek = akıllı para içeride, likidite iyi; çok yüksek (>%90) kalabalık olabilir."],
+  ["insider","Ins net","","Insider net (son 6 ay) = içeriden net alım − satım (adet). Pozitif (alım) = güçlü boğa sinyali; negatif (satım) = zayıf ayı."],
+  ["dtc","DTC","","Days to cover = short adedi ÷ ortalama günlük hacim. Yüksek = kalabalık short + squeeze potansiyeli."],
+  ["score","Sinyal","","Bileşik sinyal: P/C OI + IV skew + insider net puanından boğa/ayı/nötr. Neden öyle olduğunu detay panelindeki 'gerekçeler' gösterir."],
+];
 
 function openOpt(){document.getElementById("optSheet").hidden=false;renderOpt();if((!optData)&&ghReady())ghLoadOption().then(()=>{if(!document.getElementById("optSheet").hidden)renderOpt();}).catch(()=>{});}
 function closeOpt(){document.getElementById("optSheet").hidden=true;}
@@ -3583,7 +3597,7 @@ function renderOpt(){
   }
   const showSecs=optSectorFilter?secList.filter(s=>s===optSectorFilter):secList;
   const dir=optSort.dir,key=optSort.key;
-  const th=OPT_COLS.map(c=>`<th class="${c[2]} ${key===c[0]?'sr-th-on':''}" data-k="${c[0]}">${c[1]}</th>`).join("");
+  const th=OPT_COLS.map(c=>`<th class="${c[2]} ${key===c[0]?'sr-th-on':''}" data-k="${c[0]}" title="${esc(c[3]||'')}">${c[1]}<span class="opt-th-i">ⓘ</span></th>`).join("");
   let html="";
   if(!showSecs.length)html='<div class="sr-empty">Aramaya uyan hisse yok.</div>';
   showSecs.forEach((s,i)=>{
