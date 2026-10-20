@@ -312,7 +312,19 @@
   .bump-canvas{width:100%;min-width:560px;height:auto;border:1px solid var(--line-cool);border-radius:12px;background:rgba(0,0,0,.18)}
   /* momentum ısı-şeridi (heatmap) */
   .heat-wrap{padding:4px 0 14px;overflow-x:auto}
-  .heat-canvas{width:100%;min-width:720px;height:auto;border:1px solid var(--line-cool);border-radius:12px;background:rgba(0,0,0,.18)}
+  .heat-wrap{position:relative}
+  .heat-canvas{display:block;width:100%;min-width:720px;border:1px solid var(--line-cool);border-radius:12px;background:rgba(0,0,0,.14);cursor:crosshair}
+  :root[data-theme="light"] .heat-canvas{background:rgba(87,79,58,.03)}
+  .heat-legend{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;color:var(--faint)}
+  .heat-legend i{display:inline-block;width:110px;height:8px;border-radius:4px}
+  .heat-tip{position:absolute;z-index:5;pointer-events:none;min-width:170px;background:var(--surface-2);border:1px solid var(--line-cool);
+    border-radius:9px;padding:9px 11px;box-shadow:0 10px 28px rgba(0,0,0,.35);font-size:12px}
+  .heat-tip[hidden]{display:none}
+  .heat-tip .ht-n{font-weight:620;margin-bottom:1px}
+  .heat-tip .ht-d{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-bottom:6px}
+  .heat-tip .ht-r{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .heat-tip .ht-r b{color:var(--text);font-weight:600}
+  .heat-tip .up{color:var(--good)!important}.heat-tip .down{color:var(--bad)!important}
   /* chart modal */
   .modal[hidden]{display:none}
   .modal{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center}
@@ -1996,12 +2008,21 @@ function refDates(){
 }
 function heatVal(arr,EXT,g){const off=EXT-arr.length,i=g-off;return (i>=0&&i<arr.length)?arr[i]:null;}
 function heatMom(arr,EXT,g){const a=heatVal(arr,EXT,g-HEAT_MOM),b=heatVal(arr,EXT,g);return (a&&b)?(b/a-1)*100:null;}
-const HEAT_STOPS=[[0,[192,57,43]],[.25,[210,101,78]],[.5,[232,163,61]],[.72,[159,184,122]],[1,[46,139,87]]];
-function heatColor(v){
-  if(v==null)return isLight()?"#e6ddc4":"#121820";
-  for(let k=1;k<HEAT_STOPS.length;k++){if(v<=HEAT_STOPS[k][0]){const a=HEAT_STOPS[k-1],b=HEAT_STOPS[k],t=(v-a[0])/((b[0]-a[0])||1);const c=a[1].map((ch,j)=>Math.round(ch+(b[1][j]-ch)*t));return `rgb(${c[0]},${c[1]},${c[2]})`;}}
-  const l=HEAT_STOPS[HEAT_STOPS.length-1][1];return `rgb(${l[0]},${l[1]},${l[2]})`;
+// Ayrışan (diverging) skala: mercan = o günün en zayıfı · sakin arduvaz = orta · yeşil = lider
+const HEAT_STOPS_DARK=[[0,[214,96,74]],[.22,[150,78,68]],[.5,[52,61,73]],[.78,[66,128,96]],[1,[88,190,130]]];
+const HEAT_STOPS_LIGHT=[[0,[200,82,60]],[.25,[226,160,140]],[.5,[236,230,214]],[.75,[140,196,160]],[1,[48,148,98]]];
+const HEAT_SMOOTH=5;   // görüntüde günlük titremeyi azaltmak için 5 günlük ortalama
+function heatStops(){return isLight()?HEAT_STOPS_LIGHT:HEAT_STOPS_DARK;}
+function heatRGB(v){
+  const S=heatStops();
+  for(let k=1;k<S.length;k++){if(v<=S[k][0]){const a=S[k-1],b=S[k],t=(v-a[0])/((b[0]-a[0])||1);return a[1].map((ch,j)=>Math.round(ch+(b[1][j]-ch)*t));}}
+  return S[S.length-1][1];
 }
+function heatColor(v){
+  if(v==null)return isLight()?"rgba(87,79,58,.06)":"rgba(255,255,255,.035)";
+  const c=heatRGB(Math.max(0,Math.min(1,v)));return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+function heatGradientCss(){return "linear-gradient(90deg,"+heatStops().map(s=>`rgb(${s[1].join(",")}) ${Math.round(s[0]*100)}%`).join(",")+")";}
 function heatData(){
   const D=refDates();if(!D||D.length<HEAT_MOM+10)return null;
   const EXT=Math.min(HEAT_L+HEAT_MOM,D.length),dispLen=EXT-HEAT_MOM;
@@ -2017,42 +2038,95 @@ function heatData(){
     if(any)raw.push({name:sec.name,mom});
   });
   if(!raw.length)return null;
-  const nrow=raw.length,pct=raw.map(()=>new Array(dispLen).fill(null));
+  const nrow=raw.length,pct=raw.map(()=>new Array(dispLen).fill(null)),rank=raw.map(()=>new Array(dispLen).fill(null)),cnt=new Array(dispLen).fill(0);
   for(let c=0;c<dispLen;c++){
     const pres=[];for(let r=0;r<nrow;r++){const v=raw[r].mom[c];if(v!=null)pres.push([r,v]);}
-    pres.sort((a,b)=>a[1]-b[1]);const n=pres.length;
-    pres.forEach((p,rank)=>{pct[p[0]][c]=n>1?rank/(n-1):0.5;});
+    pres.sort((a,b)=>a[1]-b[1]);const n=pres.length;cnt[c]=n;
+    pres.forEach((p,k)=>{pct[p[0]][c]=n>1?k/(n-1):0.5;rank[p[0]][c]=n-k;});   // rank 1 = o günün lideri
   }
-  const mean=raw.map((_,r)=>{let s=0,n=0;for(let c=0;c<dispLen;c++)if(pct[r][c]!=null){s+=pct[r][c];n++;}return n?s/n:-1;});
-  const order=raw.map((_,r)=>r).sort((a,b)=>mean[b]-mean[a]);
-  return {rows:order.map(r=>({name:raw[r].name,pct:pct[r]})),dates,dispLen};
+  // görüntü için yumuşatılmış yüzdelik (son HEAT_SMOOTH gün ortalaması)
+  const sm=pct.map(row=>row.map((_,c)=>{let s=0,n=0;for(let j=Math.max(0,c-HEAT_SMOOTH+1);j<=c;j++)if(row[j]!=null){s+=row[j];n++;}return n?s/n:null;}));
+  const last=dispLen-1,ago=Math.max(0,last-21);
+  const order=raw.map((_,r)=>r).sort((a,b)=>(rank[a][last]||99)-(rank[b][last]||99));   // bugünkü sıraya göre
+  return {rows:order.map(r=>({name:raw[r].name,pct:sm[r],mom:raw[r].mom,rank:rank[r],
+      dRank:(rank[r][last]!=null&&rank[r][ago]!=null)?rank[r][ago]-rank[r][last]:null})),dates,dispLen,cnt};
 }
+function heatDate(d){return d?parseInt(d.slice(8,10))+" "+MONTHS_TR[parseInt(d.slice(5,7))-1]+" "+d.slice(0,4):"";}
 function drawHeat(cv,data){
-  const ctx=cv.getContext("2d"),W=cv.width,H=cv.height;ctx.clearRect(0,0,W,H);
-  const light=isLight(),txt=light?"#574f3a":"#E8E2D5",faint=light?"#8a7d5e":"#8B93A0";
+  const light=isLight(),dpr=window.devicePixelRatio||1;
+  const txt=light?"#4a4331":"#D9D3C6",faint=light?"#8a7d5e":"#6E7682",muted=light?"#6f6449":"#8B93A0";
+  const good=light?"#2f8a5c":"#7FB069",bad=light?"#b8472f":"#D2654E";
   const {rows,dates,dispLen}=data,nrow=rows.length;
-  const padL=172,padR=56,padT=8,padB=22,plotW=W-padL-padR,plotH=H-padT-padB;
-  const cw=plotW/dispLen,ch=plotH/nrow;
+  const W=Math.max(720,cv.clientWidth||cv.parentElement.clientWidth||960);
+  const rowH=26,gap=4,padT=26,padB=28,H=padT+nrow*rowH+padB;
+  cv.style.height=H+"px";cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const nameFont="12.5px 'Segoe UI',system-ui,sans-serif",mono="ui-monospace,'Cascadia Mono',Consolas,monospace";
+  ctx.font=nameFont;
+  const labW=Math.min(260,Math.max(...rows.map(r=>ctx.measureText(r.name).width))+12);
+  const padL=30+labW,padR=150,plotW=W-padL-padR,cw=plotW/dispLen;
+  // sütun başlıkları
+  ctx.font="600 9.5px "+mono;ctx.fillStyle=faint;ctx.textBaseline="bottom";
+  ctx.textAlign="left";ctx.fillText("SEKTÖR",30,padT-8);
+  ctx.textAlign="right";
+  const cRank=padL+plotW+46,cD=padL+plotW+88,cMom=W-12;
+  ctx.fillText("SIRA",cRank,padT-8);ctx.fillText("Δ1A",cD,padT-8);ctx.fillText("3A MOM.",cMom,padT-8);
+  // ay ayraçları
+  const months=[];let lastM=null;
+  for(let c=0;c<dispLen;c++){const d=dates[c];if(!d)continue;const m=d.slice(5,7);if(m!==lastM){lastM=m;if(c>0)months.push(c);}}
   for(let r=0;r<nrow;r++){
-    for(let c=0;c<dispLen;c++){ctx.fillStyle=heatColor(rows[r].pct[c]);ctx.fillRect(padL+c*cw,padT+r*ch,cw+0.6,ch+0.6);}
-    ctx.fillStyle=txt;ctx.font="12px 'Segoe UI',sans-serif";ctx.textAlign="right";ctx.textBaseline="middle";
-    const nm=rows[r].name.length>26?rows[r].name.slice(0,25)+"…":rows[r].name;
-    ctx.fillText(nm,padL-8,padT+r*ch+ch/2);
+    const row=rows[r],y=padT+r*rowH,h=rowH-gap;
+    // satır şeridi (yuvarlatılmış köşeler)
+    ctx.save();ctx.beginPath();ctx.roundRect(padL,y,plotW,h,5);ctx.clip();
+    for(let c=0;c<dispLen;c++){ctx.fillStyle=heatColor(row.pct[c]);ctx.fillRect(padL+c*cw,y,cw+0.8,h);}
+    ctx.restore();
+    // sıra numarası + isim
+    ctx.font="10px "+mono;ctx.fillStyle=faint;ctx.textAlign="left";ctx.textBaseline="middle";
+    ctx.fillText(String(r+1).padStart(2,"0"),10,y+h/2);
+    ctx.font=nameFont;ctx.fillStyle=r<3?txt:muted;
+    let nm=row.name;if(ctx.measureText(nm).width>labW-10){while(nm.length>4&&ctx.measureText(nm+"…").width>labW-10)nm=nm.slice(0,-1);nm=nm.trimEnd()+"…";}
+    ctx.fillText(nm,30,y+h/2);
+    // bugün: sıra · 1 ay önceye göre değişim · 3A momentum
+    const last=dispLen-1,rk=row.rank[last],dr=row.dRank,mv=row.mom[last];
+    ctx.font="600 11.5px "+mono;ctx.textAlign="right";
+    ctx.fillStyle=txt;ctx.fillText(rk!=null?"#"+rk:"—",cRank,y+h/2);
+    ctx.font="11px "+mono;
+    if(dr){ctx.fillStyle=dr>0?good:bad;ctx.fillText((dr>0?"▲":"▼")+Math.abs(dr),cD,y+h/2);}
+    else{ctx.fillStyle=faint;ctx.fillText("–",cD,y+h/2);}
+    ctx.fillStyle=mv==null?faint:(mv>=0?good:bad);ctx.fillText(mv==null?"—":(mv>=0?"+":"")+mv.toFixed(1)+"%",cMom,y+h/2);
   }
-  ctx.strokeStyle=light?"rgba(253,246,227,.5)":"rgba(14,19,24,.55)";ctx.lineWidth=1;
-  for(let r=0;r<=nrow;r++){const y=padT+r*ch;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+plotW,y);ctx.stroke();}
-  ctx.fillStyle=faint;ctx.font="10px ui-monospace,Consolas,monospace";ctx.textAlign="left";ctx.textBaseline="top";
-  let lastM=null;
-  for(let c=0;c<dispLen;c++){const d=dates[c];if(!d)continue;const m=d.slice(5,7);
-    if(m!==lastM){const day=parseInt(d.slice(8,10));lastM=m;if(c===0&&day>10)continue;
-      ctx.fillText(MONTHS_TR[parseInt(m)-1]+" '"+d.slice(2,4),padL+c*cw,H-padB+5);}}
-  const lx=W-padR+14,ly=padT,lh=plotH,lw=12;
-  const g=ctx.createLinearGradient(0,ly,0,ly+lh);
-  g.addColorStop(0,"rgb(46,139,87)");g.addColorStop(.28,"rgb(159,184,122)");g.addColorStop(.5,"rgb(232,163,61)");g.addColorStop(.75,"rgb(210,101,78)");g.addColorStop(1,"rgb(192,57,43)");
-  ctx.fillStyle=g;ctx.fillRect(lx,ly,lw,lh);
-  ctx.fillStyle=faint;ctx.font="9px ui-monospace,Consolas,monospace";ctx.textAlign="left";
-  ctx.textBaseline="bottom";ctx.fillText("güçlü",lx-1,ly-1);
-  ctx.textBaseline="top";ctx.fillText("zayıf",lx-1,ly+lh+2);
+  // ay çizgileri + etiketleri
+  ctx.strokeStyle=light?"rgba(253,246,227,.85)":"rgba(14,19,24,.7)";ctx.lineWidth=1;
+  months.forEach(c=>{const x=Math.round(padL+c*cw)+.5;ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,padT+nrow*rowH-gap);ctx.stroke();});
+  ctx.font="10px "+mono;ctx.fillStyle=faint;ctx.textAlign="left";ctx.textBaseline="top";
+  const yL=padT+nrow*rowH+4,endLbl=heatDate(dates[dispLen-1]),endW=ctx.measureText(endLbl).width;
+  [0,...months].forEach(c=>{const d=dates[c];if(!d)return;if(c===0&&parseInt(d.slice(8,10))>10)return;
+    const lbl=MONTHS_TR[parseInt(d.slice(5,7))-1]+" '"+d.slice(2,4);
+    if(padL+c*cw+4+ctx.measureText(lbl).width>padL+plotW-endW-10)return;   // sağdaki son tarihle çakışmasın
+    ctx.fillText(lbl,padL+c*cw+4,yL);});
+  ctx.textAlign="right";ctx.fillStyle=muted;ctx.fillText(endLbl,padL+plotW,yL);
+  cv._heat={padL,padT,rowH,gap,cw,plotW,nrow,data};
+}
+function wireHeatHover(cv){
+  const wrap=cv.parentElement;let tip=wrap.querySelector(".heat-tip");
+  if(!tip){tip=document.createElement("div");tip.className="heat-tip";tip.hidden=true;wrap.appendChild(tip);}
+  cv.onmouseleave=()=>{tip.hidden=true;};
+  cv.onmousemove=e=>{
+    const L=cv._heat;if(!L)return;
+    const b=cv.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;
+    const c=Math.floor((x-L.padL)/L.cw),r=Math.floor((y-L.padT)/L.rowH);
+    if(c<0||c>=L.data.dispLen||r<0||r>=L.nrow||(y-L.padT)%L.rowH>L.rowH-L.gap){tip.hidden=true;return;}
+    const row=L.data.rows[r],mv=row.mom[c],rk=row.rank[c],n=L.data.cnt[c];
+    tip.innerHTML=`<div class="ht-n">${esc(row.name)}</div><div class="ht-d">${heatDate(L.data.dates[c])}</div>
+      <div class="ht-r"><span>Sıra</span><b>${rk!=null?"#"+rk+" / "+n:"—"}</b></div>
+      <div class="ht-r"><span>3A momentum</span><b class="${mv==null?"":(mv>=0?"up":"down")}">${mv==null?"—":(mv>=0?"+":"")+mv.toFixed(1)+"%"}</b></div>`;
+    tip.hidden=false;
+    const wb=wrap.getBoundingClientRect(),tw=tip.offsetWidth,th=tip.offsetHeight;
+    let lx=e.clientX-wb.left+wrap.scrollLeft+14,ly=e.clientY-wb.top+14;
+    if(lx+tw>wrap.scrollLeft+wb.width-4)lx=e.clientX-wb.left+wrap.scrollLeft-tw-14;
+    if(ly+th>wb.height-4)ly=e.clientY-wb.top-th-10;
+    tip.style.left=lx+"px";tip.style.top=ly+"px";
+  };
 }
 function renderRotation(){
   const el=document.getElementById("rotation");if(!el)return;
@@ -2131,14 +2205,14 @@ function renderRotation(){
       }
     }
   }else{ // heat — momentum ısı-şeridi
-    ctrls=`<span class="rot-ref">günlük · ${Math.round(HEAT_MOM/21)} ay momentum · her gün sektörler-arası sıra</span>`;
+    ctrls=`<span class="rot-ref">günlük · ${Math.round(HEAT_MOM/21)} ay momentum · sektörler-arası sıra</span>
+      <span class="heat-legend" title="Her gün sektörler kendi aralarında sıralanır"><span>zayıf</span><i style="background:${heatGradientCss()}"></i><span>güçlü</span></span>`;
     if(rotationOpen){
       heatHD=heatData();
       if(!heatHD){body=`<div class="rrg-empty">Isı-şeridi için yeterli fiyat geçmişi yok — verileri güncelle (her sektörde ~4 ay+ geçmiş gerekir).</div>`;}
       else{
-        const HH=heatHD.rows.length*26+30;
-        body=`<div class="rrg-note" style="margin-bottom:6px">Her satır bir sektör · her gün, sektörler o günkü ${Math.round(HEAT_MOM/21)}-aylık momentuma göre sıralanır · koyu yeşil = o günün lideri, kırmızı = en zayıf</div>
-          <div class="heat-wrap"><canvas class="heat-canvas" id="heatCanvas" width="1180" height="${HH}"></canvas></div>`;
+        body=`<div class="heat-wrap"><canvas class="heat-canvas" id="heatCanvas"></canvas></div>
+          <div class="rrg-note" style="margin:-4px 0 12px">Her gün sektörler ${Math.round(HEAT_MOM/21)} aylık momentuma göre kendi aralarında sıralanır · renk = o günkü sıra (${HEAT_SMOOTH} günlük ortalama) · satırlar bugünkü sıraya göre · Δ1A = 1 ay önceki sıraya göre değişim · üzerine gel → detay</div>`;
       }
     }
   }
@@ -2161,7 +2235,7 @@ function renderRotation(){
     el.querySelectorAll(".rotwin[data-bm]").forEach(b=>b.onclick=()=>{bumpMetric=b.dataset.bm;localStorage.setItem("sm-bumpmetric",bumpMetric);renderRotation();});
     const cv=document.getElementById("bumpCanvas");if(cv){const B=bumpSeries();if(B&&B.n>=2)drawBump(cv,B,bumpMetric);}
   }else{
-    const cv=document.getElementById("heatCanvas");if(cv&&heatHD)drawHeat(cv,heatHD);
+    const cv=document.getElementById("heatCanvas");if(cv&&heatHD){drawHeat(cv,heatHD);wireHeatHover(cv);}
   }
 }
 
@@ -3835,6 +3909,7 @@ function toggleTheme(){
   if(!document.getElementById("chartModal").hidden)renderChart();
 }
 document.getElementById("themeBtn").onclick=toggleTheme;
+window.addEventListener("resize",()=>{clearTimeout(window._heatRz);window._heatRz=setTimeout(()=>{const cv=document.getElementById("heatCanvas");if(cv&&cv._heat)drawHeat(cv,cv._heat.data);},150);});
 syncThemeBtn();
 
 document.querySelectorAll('[data-close="news"]').forEach(el=>el.onclick=closeNews);
