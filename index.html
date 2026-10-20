@@ -635,6 +635,80 @@
   :root[data-theme="light"] .modal-bg{background:rgba(40,30,8,.30)}
   :root[data-theme="light"] .modal-card{box-shadow:0 30px 80px rgba(80,60,20,.22)}
   :root[data-theme="light"] .flash{box-shadow:0 10px 30px rgba(80,60,20,.25)}
+
+  /* ============ PASTEL — butter yellow · soft pink · soft green (açık temanın üstüne) ============ */
+  :root[data-skin="pastel"]{
+    --ground:#FFF9EE;
+    --surface:#FFFFFF;
+    --surface-2:#FFF5DA;
+    --text:#4B3F4A;
+    --muted:#8E7C8A;
+    --faint:#B9A8B5;
+    --accent:#E07AA3;      /* soft pink (okunur ton) */
+    --accent-2:#5FA383;    /* soft green (okunur ton) */
+    --line:rgba(236,150,184,.38);
+    --line-cool:rgba(150,200,170,.42);
+    --good:#4E9F76;
+    --bad:#E0668A;
+    --butter:#FBE7A1;
+    --pink:#F9D3E0;
+    --mint:#D4ECDB;
+  }
+  :root[data-skin="pastel"] body{
+    background:
+      radial-gradient(900px 520px at 92% -8%,rgba(249,211,224,.65),transparent 60%),
+      radial-gradient(760px 560px at -4% 4%,rgba(251,231,161,.55),transparent 58%),
+      radial-gradient(900px 700px at 50% 120%,rgba(212,236,219,.6),transparent 60%),
+      var(--ground);
+  }
+  :root[data-skin="pastel"] header.bar{background:linear-gradient(180deg,rgba(255,245,218,.92),rgba(255,249,238,.55));border-bottom-color:rgba(236,150,184,.35)}
+  :root[data-skin="pastel"] .glyph{color:#E07AA3;text-shadow:0 0 14px rgba(240,140,180,.45)}
+  :root[data-skin="pastel"] .brand h1{color:#4B3F4A}
+  :root[data-skin="pastel"] .srcbar{background:rgba(212,236,219,.45);border-bottom-color:rgba(150,200,170,.35)}
+  :root[data-skin="pastel"] .tape{background:linear-gradient(90deg,rgba(249,211,224,.55),rgba(255,245,218,.8),rgba(212,236,219,.55))}
+  :root[data-skin="pastel"] .tape::before{background:linear-gradient(90deg,var(--ground),transparent)}
+  :root[data-skin="pastel"] .tape::after{background:linear-gradient(270deg,var(--ground),transparent)}
+  :root[data-skin="pastel"] .tape-item b{color:#D46A96}
+  /* yuvarlak, yumuşak bileşenler */
+  :root[data-skin="pastel"] .card{border-radius:20px;background:#fff;border-color:rgba(236,150,184,.28);box-shadow:0 6px 22px rgba(224,122,163,.10)}
+  :root[data-skin="pastel"] .card-head{border-bottom-color:rgba(236,150,184,.22)}
+  :root[data-skin="pastel"] .idx{background:var(--pink);border-color:transparent;color:#C25A86;border-radius:8px}
+  :root[data-skin="pastel"] .btn{border-radius:999px;background:#fff;border-color:rgba(236,150,184,.4)}
+  :root[data-skin="pastel"] .btn:hover{background:var(--pink);border-color:#E07AA3}
+  :root[data-skin="pastel"] .btn.primary{background:var(--butter);border-color:rgba(214,180,70,.5);color:#6B5418}
+  :root[data-skin="pastel"] .btn.primary:hover{background:#F8DC7E;border-color:#D6B446}
+  :root[data-skin="pastel"] .btn.ghost{background:none;border-color:transparent}
+  :root[data-skin="pastel"] .btn.ok{background:var(--mint);border-color:#7FBF9C;color:#2F7A55}
+  :root[data-skin="pastel"] .search{border-radius:999px;background:#fff;border-color:rgba(236,150,184,.4)}
+  :root[data-skin="pastel"] .fchip{border-radius:999px;background:#fff;border-color:rgba(236,150,184,.35)}
+  :root[data-skin="pastel"] .fchip:hover{border-color:#E07AA3;color:var(--text)}
+  :root[data-skin="pastel"] .fchip.on{background:var(--butter);border-color:#E0C25C;color:#6B5418}
+  :root[data-skin="pastel"] .fchip.on .fc{color:#6B5418;background:rgba(255,255,255,.6)}
+  :root[data-skin="pastel"] .rot-view,:root[data-skin="pastel"] .rot-win,:root[data-skin="pastel"] .irange{border-radius:999px;background:#fff;border-color:rgba(236,150,184,.35)}
+  :root[data-skin="pastel"] .rotview,:root[data-skin="pastel"] .rotwin,:root[data-skin="pastel"] .ir{border-radius:999px}
+  :root[data-skin="pastel"] .rotview.on,:root[data-skin="pastel"] .rotwin.on,:root[data-skin="pastel"] .ir.on,
+  :root[data-skin="pastel"] .rbtn.on,:root[data-skin="pastel"] .fon-retmode .rmbtn.on,:root[data-skin="pastel"] .akiswin.on{background:var(--butter);color:#6B5418;border-color:#E0C25C}
+  :root[data-skin="pastel"] .rbtn,:root[data-skin="pastel"] .fon-retmode .rmbtn{border-radius:999px}
+  :root[data-skin="pastel"] .rot-title{color:#D46A96}
+  :root[data-skin="pastel"] .rot-bar.pos{background:linear-gradient(90deg,#CDE8D5,#7CC39C)}
+  :root[data-skin="pastel"] .rot-bar.neg{background:linear-gradient(270deg,#F9D3E0,#EC8DB0)}
+  :root[data-skin="pastel"] .heat-canvas,:root[data-skin="pastel"] .rrg-canvas{background:#fff;border-color:rgba(236,150,184,.3);border-radius:20px}
+  :root[data-skin="pastel"] .heat-tip{background:#fff;border-color:rgba(236,150,184,.45);border-radius:14px;box-shadow:0 10px 28px rgba(224,122,163,.18)}
+  :root[data-skin="pastel"] .modal-card{background:#fff;border-radius:22px;border-color:rgba(236,150,184,.35);box-shadow:0 30px 80px rgba(224,122,163,.22)}
+  :root[data-skin="pastel"] .modal-bg{background:rgba(120,70,100,.22)}
+  :root[data-skin="pastel"] .fon-sheet,:root[data-skin="pastel"] .tr-sheet,:root[data-skin="pastel"] .opt-sheet{background:var(--ground)}
+  :root[data-skin="pastel"] .fon-card{background:#fff;border-radius:18px;border-color:rgba(236,150,184,.3)}
+  :root[data-skin="pastel"] .fon-card.active{background:var(--butter);border-color:#E0C25C}
+  :root[data-skin="pastel"] .fon-chip,:root[data-skin="pastel"] .chip{border-radius:999px;background:var(--mint);border-color:transparent}
+  :root[data-skin="pastel"] .size-tag{background:var(--pink);border-color:transparent;color:#B2557E}
+  :root[data-skin="pastel"] .mc-tag{background:var(--mint);border-color:transparent;color:#3E8463}
+  :root[data-skin="pastel"] .dot.on{background:#E07AA3;box-shadow:0 0 6px rgba(224,122,163,.5)}
+  :root[data-skin="pastel"] .riskbadge{background:#fff;border-radius:999px}
+  :root[data-skin="pastel"] .add-sector{border-radius:20px;border-color:rgba(236,150,184,.5);background:rgba(249,211,224,.18)}
+  :root[data-skin="pastel"] .add-sector:hover{background:var(--pink);color:#C25A86}
+  :root[data-skin="pastel"] .addco{border-radius:999px;border-color:rgba(236,150,184,.5)}
+  :root[data-skin="pastel"] .flash{background:#fff;border-color:#E07AA3;border-radius:999px}
+  :root[data-skin="pastel"] ::selection{background:rgba(249,211,224,.9)}
   /* ---------- Fon Akışı (💧) paneli ---------- */
   .akis-ctrls{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
   .akis-seg{display:flex;gap:3px;background:var(--ground);border:1px solid var(--line-cool);border-radius:7px;padding:3px}
@@ -655,7 +729,7 @@
   .akis-hl .up{color:var(--good)}
   .akis-hl .down{color:var(--bad)}
 </style>
-<script>(function(){try{var t=localStorage.getItem("sm-theme");if(t==="light")document.documentElement.dataset.theme="light";}catch(e){}})();</script>
+<script>(function(){try{var t=localStorage.getItem("sm-theme");if(t==="light"||t==="pastel")document.documentElement.dataset.theme="light";if(t==="pastel")document.documentElement.dataset.skin="pastel";}catch(e){}})();</script>
 
 <header class="bar">
   <div class="brand">
@@ -2012,7 +2086,10 @@ function heatMom(arr,EXT,g){const a=heatVal(arr,EXT,g-HEAT_MOM),b=heatVal(arr,EX
 const HEAT_STOPS_DARK=[[0,[196,72,58]],[.25,[226,128,74]],[.5,[234,206,118]],[.75,[150,196,110]],[1,[60,156,98]]];
 const HEAT_STOPS_LIGHT=[[0,[196,72,58]],[.25,[226,128,74]],[.5,[228,192,96]],[.75,[146,190,104]],[1,[52,148,92]]];
 const HEAT_SMOOTH=5;   // görüntüde günlük titremeyi azaltmak için 5 günlük ortalama
-function heatStops(){return isLight()?HEAT_STOPS_LIGHT:HEAT_STOPS_DARK;}
+// Pastel: soft pink = zayıf · butter yellow = orta · soft green = güçlü
+const HEAT_STOPS_PASTEL=[[0,[236,128,166]],[.25,[246,186,204]],[.5,[251,229,150]],[.75,[184,222,180]],[1,[104,186,140]]];
+function isPastel(){return document.documentElement.dataset.skin==="pastel";}
+function heatStops(){return isPastel()?HEAT_STOPS_PASTEL:(isLight()?HEAT_STOPS_LIGHT:HEAT_STOPS_DARK);}
 function heatRGB(v){
   const S=heatStops();
   for(let k=1;k<S.length;k++){if(v<=S[k][0]){const a=S[k-1],b=S[k],t=(v-a[0])/((b[0]-a[0])||1);return a[1].map((ch,j)=>Math.round(ch+(b[1][j]-ch)*t));}}
@@ -2055,7 +2132,7 @@ function heatDate(d){return d?parseInt(d.slice(8,10))+" "+MONTHS_TR[parseInt(d.s
 function drawHeat(cv,data){
   const light=isLight(),dpr=window.devicePixelRatio||1;
   const txt=light?"#4a4331":"#D9D3C6",faint=light?"#8a7d5e":"#6E7682",muted=light?"#6f6449":"#8B93A0";
-  const good=light?"#2f8a5c":"#7FB069",bad=light?"#b8472f":"#D2654E";
+  const good=isPastel()?"#3F9A6E":(light?"#2f8a5c":"#7FB069"),bad=isPastel()?"#D9578A":(light?"#b8472f":"#D2654E");
   const {rows,dates,dispLen}=data,nrow=rows.length;
   const W=Math.max(720,cv.clientWidth||cv.parentElement.clientWidth||960);
   const rowH=26,gap=4,padT=26,padB=28,H=padT+nrow*rowH+padB;
@@ -3897,12 +3974,16 @@ document.getElementById("fonPrintBtn").onclick=fonPrintSummary;
 document.getElementById("fonPassGo").onclick=tryFonPass;
 document.getElementById("fonPass").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();tryFonPass();}});
 document.getElementById("riskBadge").onclick=openRegimeModal;
-function currentTheme(){return document.documentElement.dataset.theme==="light"?"light":"dark";}
-function syncThemeBtn(){const b=document.getElementById("themeBtn");if(b)b.textContent=currentTheme()==="light"?"☀":"🌙";}
+// Temalar: koyu → açık → pastel (pastel = açık temanın üstüne data-skin="pastel")
+function currentTheme(){const r=document.documentElement.dataset;return r.skin==="pastel"?"pastel":(r.theme==="light"?"light":"dark");}
+const THEME_NEXT={dark:"light",light:"pastel",pastel:"dark"};
+const THEME_ICON={dark:"🌙",light:"☀",pastel:"🌸"};
+const THEME_TITLE={dark:"Koyu tema — tıkla: açık",light:"Açık tema — tıkla: pastel",pastel:"Pastel tema — tıkla: koyu"};
+function syncThemeBtn(){const b=document.getElementById("themeBtn");if(b){const t=currentTheme();b.textContent=THEME_ICON[t];b.title=THEME_TITLE[t];}}
 function toggleTheme(){
-  const t=currentTheme()==="light"?"dark":"light";
-  if(t==="light")document.documentElement.dataset.theme="light";
-  else document.documentElement.removeAttribute("data-theme");
+  const t=THEME_NEXT[currentTheme()],r=document.documentElement;
+  if(t==="dark")r.removeAttribute("data-theme");else r.dataset.theme="light";
+  if(t==="pastel")r.dataset.skin="pastel";else r.removeAttribute("data-skin");
   try{localStorage.setItem("sm-theme",t);}catch(e){}
   syncThemeBtn();
   render(true);   // grafik grid çizgileri tema-duyarlı → yeniden çiz
