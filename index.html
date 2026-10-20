@@ -2834,7 +2834,13 @@ let yabWin="1d", yabRotWin="1d", yabRotBase="SPY";
 const YAB_WIN=[["1d","1 Gün"],["1w","1 Hafta"],["1m","1 Ay"],["3m","3 Ay"],["cost","Alış"]];
 const YAB_ROT_WIN=[["1d","1 Gün",1],["1w","1 Hafta",5],["1m","1 Ay",21]];
 const YAB_ROT_BASE=[["SPY","SPY"],["QQQ","QQQ"],["evren","Evren"],["mutlak","Mutlak"]];
-function yabTk(h){return (h.ticker||"").replace(/\s+(US|LI|LN)$/i,"").toUpperCase();}
+// Fon dosyasındaki kodu panel koduna çevir: "XBI US" → XBI, "SMSN" → panelde SMSN.L ise SMSN.L
+function yabTk(h){
+  const tk=(h.ticker||"").replace(/\s+(US|LI|LN)$/i,"").toUpperCase();
+  if(quoteOf(tk)||isTracked(tk))return tk;
+  for(const s of state.sectors)for(const c of s.companies){const t=(c.ticker||"").toUpperCase();if(t.split(":").pop().split(".")[0]===tk)return t;}
+  return tk;
+}
 function yabIsCash(h){return h.kind==="other"&&(h.ticker||"").toUpperCase()===(h.market||"").toUpperCase();}  // USD / EUR nakit
 function yabIsForeign(h){return !!h.market&&h.market!=="TR";}
 function yabSecOf(r){return r.h.sector||tickerSectorName(r.tk)||"Takip edilmiyor";}
