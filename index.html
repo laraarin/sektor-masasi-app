@@ -2082,9 +2082,9 @@ function refDates(){
 }
 function heatVal(arr,EXT,g){const off=EXT-arr.length,i=g-off;return (i>=0&&i<arr.length)?arr[i]:null;}
 function heatMom(arr,EXT,g){const a=heatVal(arr,EXT,g-HEAT_MOM),b=heatVal(arr,EXT,g);return (a&&b)?(b/a-1)*100:null;}
-// Klasik skala: kırmızı = o günün en zayıfı · turuncu · açık sarı = orta · açık yeşil · yeşil = lider
-const HEAT_STOPS_DARK=[[0,[196,72,58]],[.25,[226,128,74]],[.5,[234,206,118]],[.75,[150,196,110]],[1,[60,156,98]]];
-const HEAT_STOPS_LIGHT=[[0,[196,72,58]],[.25,[226,128,74]],[.5,[228,192,96]],[.75,[146,190,104]],[1,[52,148,92]]];
+// Klasik skala: vişne = o günün en zayıfı · mercan-turuncu · açık sarı = orta · açık yeşil · yeşil = lider
+const HEAT_STOPS_DARK=[[0,[152,26,52]],[.25,[214,98,76]],[.5,[234,206,118]],[.75,[150,196,110]],[1,[60,156,98]]];
+const HEAT_STOPS_LIGHT=[[0,[150,24,50]],[.25,[214,98,76]],[.5,[228,192,96]],[.75,[146,190,104]],[1,[52,148,92]]];
 const HEAT_SMOOTH=5;   // görüntüde günlük titremeyi azaltmak için 5 günlük ortalama
 // Pastel: soft pink = zayıf · butter yellow = orta · soft green = güçlü
 const HEAT_STOPS_PASTEL=[[0,[236,128,166]],[.25,[246,186,204]],[.5,[251,229,150]],[.75,[184,222,180]],[1,[104,186,140]]];
