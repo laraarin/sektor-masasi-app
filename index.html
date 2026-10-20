@@ -3069,7 +3069,7 @@ function yabBtns(list,cur,attr){return `<span class="fon-retmode" style="margin-
 const FON_LIMITS={BVV:{yabTema:[40,70],yabToplam:80,temaDisi:20,
   src:"BVV izahnamesi md. 2.2 — temaya uygun yabancı ortaklık payı/ÖSBA/yabancı BYF %40–70 · yabancı para ve araçlar toplamı %80'in altında · tema dışı ortaklık payları ≤%20 · kripto işlem platformu payları alınamaz"}};
 const YAB_CRYPTO_BAN=["COIN","HOOD","MSTR"];   // izahname: kripto varlık / işlem platformu bağlantılı paylar dahil edilemez
-let yabSleeve={pct:10,n:3,L:4};
+let yabSleeve={pct:10,n:3,L:26};
 try{const v=JSON.parse(localStorage.getItem("sm-yab-sleeve")||"null");if(v&&v.pct&&v.n)yabSleeve=v;}catch(e){}
 function saveYabSleeve(){try{localStorage.setItem("sm-yab-sleeve",JSON.stringify(yabSleeve));}catch(e){}}
 const YAB_LOW=1.0;   // fonun %1'inin altı = "ağırlık düşük"
@@ -3138,7 +3138,8 @@ function yabRotHtml(D,fk,X){
     <div class="fon-sub-lbl" style="margin-top:8px">Getiri/ayrışma = ana sayfadaki Sektör Rotasyonu (takip listesinin eşit ağırlıklı getirisi). Bulunma = ${esc(fk)}'nin o sektördeki yabancı pozisyonlarının fon içindeki payı · TL · hisse sayısı. Katkı = ${esc(fk)}'nin o sektördeki pozisyonlarının seçili pencerede fona kazandırdığı puan. "Ağırlık düşük" = fonun %${YAB_LOW}'inin altı.</div>`;
 }
 /* ===== Haftalık Rotasyon Sepeti (rotasyon-sepet.json) ===== */
-const SEPET_L=[["1","1 hafta"],["4","1 ay"],["12","3 ay"]];
+const SEPET_L=[["1","1 hafta"],["4","1 ay"],["12","3 ay"],["26","6 ay"]];
+function sepetLLbl(l){return {1:"1 hafta",4:"1 ay",12:"3 ay",26:"6 ay"}[l]||(l+" hafta");}
 let sepetBtPer="all", sepetBtWeek="";
 // Haftalık getiri listesinden istatistik (yüzde cinsinden girdiler)
 function sepetStats(W){
@@ -3158,7 +3159,7 @@ function sepetCurveOf(W){
   ["etf","stock","etfAll","spy"].forEach(k=>{let e=100;c[k]=[100].concat(W.map(w=>(e*=1+(w[k]||0)/100,Math.round(e*100)/100)));});
   return c;
 }
-function sepetKey(){return "L"+(yabSleeve.L||4)+"N"+(yabSleeve.n||3);}
+function sepetKey(){return "L"+(yabSleeve.L||26)+"N"+(yabSleeve.n||3);}
 function fmtDM(d){return d?d.slice(8,10)+"."+d.slice(5,7):"";}
 // Cuma kapanışından (giriş) bu yana canlı getiri: Prizma fiyat verisinden
 function sepetLive(tk,px){const q=quoteOf(tk);if(!q||q.price==null||!px)return null;return (q.price/px-1)*100;}
@@ -3180,7 +3181,7 @@ function drawSepetCurve(cv,curve,lines){
     curve[l.k].forEach((v,i)=>{const x=X(i),y=Y(Math.max(v,0.01));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();ctx.setLineDash([]);});
 }
 function yabSleeveHtml(D,fk,X){
-  const P=yabSleeve.pct,N=yabSleeve.n||3,Lw=yabSleeve.L||4,key=sepetKey();
+  const P=yabSleeve.pct,N=yabSleeve.n||3,Lw=yabSleeve.L||26,key=sepetKey();
   const ctl=`<span class="fon-sub-lbl">dilim</span> ${yabBtns([["5","%5"],["10","%10"],["15","%15"],["20","%20"]],String(P),"data-slpct")}
     <span class="fon-sub-lbl">sinyal</span> ${yabBtns(SEPET_L,String(Lw),"data-sll")}
     <span class="fon-sub-lbl">sektör</span> ${yabBtns([["2","2"],["3","3"],["4","4"]],String(N),"data-sln")}`;
@@ -3225,7 +3226,7 @@ function yabSleeveHtml(D,fk,X){
       <div class="yab-opt"><div class="yab-opt-h">B · Hisse ile (eşit dağıtım)</div>
         <table class="od-tbl" style="width:100%;margin-top:4px"><thead><tr><th class="l">Hisse</th><th>Cuma</th><th>Tutar</th><th>≈ Adet</th><th>Bu hafta</th></tr></thead><tbody>${stockRows}</tbody></table></div></div>`;}).join("");
   const wkE=sepetAvg(etfL),wkS=sepetAvg(stkL);
-  let html=head+`<div class="fon-sub-lbl" style="margin:-4px 0 10px">Seçim: <b>Cuma ${fmtDM(cur.asOf)} kapanışı</b> · sinyal = sektördeki takip hisselerinin son ${Lw===1?"1 hafta":Lw===4?"1 ay":"3 ay"} getirisi (eşit ağırlık) · en güçlü ${N} sektöre eşit ağırlık · dilim ${fmtTL(sleeveTl)} · her Cumartesi sabahı yenilenir ve kaydedilir</div>
+  let html=head+`<div class="fon-sub-lbl" style="margin:-4px 0 10px">Seçim: <b>Cuma ${fmtDM(cur.asOf)} kapanışı</b> · sinyal = sektördeki takip hisselerinin son ${sepetLLbl(Lw)} getirisi (eşit ağırlık) · en güçlü ${N} sektöre eşit ağırlık · dilim ${fmtTL(sleeveTl)} · her Cumartesi sabahı yenilenir ve kaydedilir</div>
     <div class="yab-wk"><div><span>Bu hafta · ETF sepeti</span><b>${lv(wkE)}</b></div><div><span>Bu hafta · Hisse sepeti</span><b>${lv(wkS)}</b></div><div><span>SPY</span><b>${lv(spyLive)}</b></div>
       <div><span>ETF − SPY</span><b>${wkE!=null&&spyLive!=null?yabPct(wkE-spyLive):"—"}</b></div><div class="fon-sub-lbl" style="align-self:center">Cuma ${fmtDM(cur.asOf)} kapanışından bugüne (Prizma fiyat verisi)</div></div>
     <div class="yab-sl-grid">${cards}</div>
@@ -3259,10 +3260,10 @@ function yabSleeveHtml(D,fk,X){
     <canvas id="sepetCurve" style="display:block;width:100%;margin-top:10px;border:1px solid var(--line-cool);border-radius:10px"></canvas>
     <div class="fon-sub-lbl" style="margin-top:4px">Seçili dönemin başında 100 ile başlayan kümülatif değer (log ölçek) · mavi = ETF rotasyonu · turuncu = hisse rotasyonu · yeşil kesikli = tüm sektör ETF'leri · pembe = SPY</div>`;
   // varyant karşılaştırma ızgarası (seçili dönemde)
-  const vs=sepetData.variants,Ls=sepetData.lookbacks||[1,4,12],Ns=sepetData.ns||[2,3,4];
+  const vs=sepetData.variants,Ls=sepetData.lookbacks||[1,4,12,26],Ns=sepetData.ns||[2,3,4];
   html+=`<div class="fon-sec-h" style="margin-top:16px">Ayar karşılaştırması <span class="fon-sub-lbl">· ${esc(PER[perKey][0])} · dönem getirisi ETF / hisse · tıkla → seç</span></div>
     <table class="fon-tbl" style="max-width:640px"><thead><tr><th>Sinyal \\ Sektör</th>${Ns.map(n=>`<th class="r">${n} sektör</th>`).join("")}</tr></thead><tbody>${
-    Ls.map(l=>`<tr><td>${l===1?"1 hafta":l===4?"1 ay":"3 ay"}</td>${Ns.map(n=>{const v=vs["L"+l+"N"+n];if(!v)return "<td></td>";const on=("L"+l+"N"+n)===key;
+    Ls.map(l=>`<tr><td>${sepetLLbl(l)}</td>${Ns.map(n=>{const v=vs["L"+l+"N"+n];if(!v)return "<td></td>";const on=("L"+l+"N"+n)===key;
       const s2=sepetStats((v.weeks||[]).filter(w=>!from||w.d>=from));
       return `<td class="r" data-slv="${l},${n}" style="cursor:pointer;${on?"background:rgba(233,165,60,.12);":""}">${sc(s2.etf&&s2.etf.cum)} <span style="color:var(--faint)">/ ${sc(s2.stock&&s2.stock.cum)}</span></td>`;}).join("")}</tr>`).join("")}</tbody></table>
     <div class="fon-sub-lbl" style="margin-top:4px">Aynı dönemde: tüm sektör ETF'leri ${sc(st.etfAll&&st.etfAll.cum)} · SPY ${sc(st.spy&&st.spy.cum)} · QQQ ${sc(st.qqq&&st.qqq.cum)}.</div>`;
@@ -3273,7 +3274,7 @@ function yabSleeveHtml(D,fk,X){
     const det=curW.det||[];
     const opts=wsel.map(w=>`<option value="${w.d}" ${w.d===curW.d?"selected":""}>${fmtDM(w.d)}.${w.d.slice(0,4)} → ${fmtDM(w.end)} · ETF ${sc(w.etf)} · hisse ${sc(w.stock)} · SPY ${sc(w.spy)}</option>`).join("");
     html+=`<div class="fon-sec-h" style="margin-top:16px">🗓 Haftanın seçimleri <select class="minisel" id="sepetWeekSel" style="margin-left:8px;text-transform:none;letter-spacing:0">${opts}</select></div>
-      <div class="fon-sub-lbl" style="margin:-4px 0 10px">Cuma <b>${fmtDM(curW.d)}.${curW.d.slice(0,4)}</b> kapanışında seçildi → <b>${fmtDM(curW.end)}</b> Cuma kapanışına kadar tutuldu. "Sinyal" = seçim anındaki son ${Lw===1?"1 hafta":Lw===4?"1 ay":"3 ay"} getirisi, "Hafta" = tutulan haftadaki gerçekleşen getiri.</div>
+      <div class="fon-sub-lbl" style="margin:-4px 0 10px">Cuma <b>${fmtDM(curW.d)}.${curW.d.slice(0,4)}</b> kapanışında seçildi → <b>${fmtDM(curW.end)}</b> Cuma kapanışına kadar tutuldu. "Sinyal" = seçim anındaki son ${sepetLLbl(Lw)} getirisi, "Hafta" = tutulan haftadaki gerçekleşen getiri.</div>
       <div class="yab-wk"><div><span>ETF sepeti</span><b>${lv(curW.etf)}</b></div><div><span>Hisse sepeti</span><b>${lv(curW.stock)}</b></div><div><span>SPY</span><b>${lv(curW.spy)}</b></div><div><span>QQQ</span><b>${lv(curW.qqq)}</b></div><div><span>Tüm sektör ETF'leri</span><b>${lv(curW.etfAll)}</b></div></div>
       <div class="yab-sl-grid">${det.map((p,i)=>`<div class="yab-sl-card"><div class="yab-sl-h"><span class="idx">${i+1}</span><b>${esc(p.s)}</b></div>
         <div class="yab-sl-w"><span>Sinyal</span><b class="${(p.sc||0)>=0?"up":"down"}">${sc(p.sc)}</b><span style="color:var(--muted)">sektör ort.</span></div>
