@@ -483,6 +483,13 @@
     #fonPrint tr{page-break-inside:avoid}
   }
   .fon-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
+  /* fon yabancı analizi */
+  .yab-hls{display:flex;flex-direction:column;gap:6px;margin:2px 0 12px}
+  .yab-st{font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid var(--line-cool);white-space:nowrap;color:var(--faint)}
+  .yab-st.pos{color:var(--good);border-color:rgba(127,176,105,.45)}
+  .yab-st.opp{color:var(--accent);border-color:var(--line);background:rgba(233,165,60,.08)}
+  .yab-st.neg{color:var(--bad);border-color:rgba(210,101,78,.45)}
+  .fon-tbl tr.yab-held td:first-child{box-shadow:inset 3px 0 0 var(--accent-2)}
   /* haftalık sektör bülteni (rotasyon) */
   .tr-hls{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
   .tr-hl{font-size:12.5px;line-height:1.5}
@@ -1736,7 +1743,8 @@ function renderChart(){
 let rotationWin=localStorage.getItem("sm-rotwin")||"1A";
 let rotationOpen=localStorage.getItem("sm-rotopen")!=="0";
 let rotBase=localStorage.getItem("sm-rotbase")||"mutlak";   // kıyas: mutlak | evren | SPY | QQQ | IWM
-const ROT_WINDOWS=[["1H",5],["1A",21]]; // işlem günü: ~1 hafta / ~1 ay
+const ROT_WINDOWS=[["1G",1],["1H",5],["1A",21]]; // işlem günü: son gün / ~1 hafta / ~1 ay
+const ROT_WIN_LBL={"1G":"1 Gün","1H":"1 Hafta","1A":"1 Ay"};
 const BENCHES=["SPY","QQQ","IWM"];
 let rotView=localStorage.getItem("sm-rotview")||"list"; if(rotView!=="list"&&rotView!=="heat")rotView="list";      // list | heat (Kadran/Zaman kaldırıldı)
 let rrgBench=localStorage.getItem("sm-rrgbench")||"SPY";     // RRG kadranı benchmark'ı
@@ -1804,7 +1812,8 @@ function drawZAxis(cv,z,dates){
   }
 }
 function benchReturns(days){const o={};BENCHES.forEach(b=>{const q=quoteOf(b);o[b]=(q&&q.hist&&q.hist.c)?winReturn(q.hist.c,days):null;});return o;}
-function sectorRotation(days){
+function sectorRotation(days,base){
+  base=base||rotBase;
   const rows=state.sectors.map(sec=>{
     const rets=[];
     sec.companies.forEach(c=>{const q=quoteOf(c.ticker);if(q&&q.hist&&q.hist.c){const r=winReturn(q.hist.c,days);if(r!=null)rets.push(r);}});
@@ -1815,12 +1824,12 @@ function sectorRotation(days){
   });
   const valid=rows.filter(r=>r.ret!=null);
   const uni=valid.length?valid.reduce((a,b)=>a+b.ret,0)/valid.length:0;  // kendi evren ortalaman
-  const isBench=(rotBase!=="mutlak"&&rotBase!=="evren");
+  const isBench=(base!=="mutlak"&&base!=="evren");
   let benchRet=null;
-  if(isBench){const bq=quoteOf(rotBase);benchRet=(bq&&bq.hist&&bq.hist.c)?winReturn(bq.hist.c,days):null;}
+  if(isBench){const bq=quoteOf(base);benchRet=(bq&&bq.hist&&bq.hist.c)?winReturn(bq.hist.c,days):null;}
   const baseMissing=isBench&&benchRet==null;
   let baseline=0;                                       // Mutlak: kıyas yok (taban 0)
-  if(rotBase==="evren"||baseMissing)baseline=uni;       // Evren ort. (bench eksikse de buna düş)
+  if(base==="evren"||baseMissing)baseline=uni;          // Evren ort. (bench eksikse de buna düş)
   else if(isBench)baseline=benchRet;                    // SPY/QQQ/IWM getirisi
   valid.forEach(r=>{r.rel=r.ret-baseline;});            // bar bu değere göre (Mutlak'ta = mutlak getiri)
   return {rows,uni,baseline,benchRet,baseMissing};
@@ -2060,7 +2069,7 @@ function renderRotation(){
     const baseBtns=BASES.map(b=>`<button class="rotwin ${rotBase===b[0]?'on':''}" data-rb="${b[0]}" title="${b[0]==='mutlak'?'Kıyas yok — mutlak getiriye göre yeşil/kırmızı':(b[0]==='evren'?'Kendi takip evreninin ortalamasına göre':b[0]+' endeksine göre')}">${b[1]}</button>`).join("");
     const isCmp=rotBase!=="mutlak";
     const refTxt=BENCHES.filter(b=>br[b]!=null).map(b=>`${b} <b class="${br[b]>=0?'up':'down'}">${br[b]>=0?'+':''}${br[b].toFixed(1)}%</b>`).join(" · ")||"benchmark verisi yok";
-    ctrls=`<span class="rot-win">${ROT_WINDOWS.map(w=>`<button class="rotwin ${rotationWin===w[0]?'on':''}" data-rw="${w[0]}">${w[0]==="1H"?"1 Hafta":"1 Ay"}</button>`).join("")}</span>
+    ctrls=`<span class="rot-win">${ROT_WINDOWS.map(w=>`<button class="rotwin ${rotationWin===w[0]?'on':''}" data-rw="${w[0]}">${ROT_WIN_LBL[w[0]]}</button>`).join("")}</span>
       <span class="rot-klabel">Kıyas</span><span class="rot-win">${baseBtns}</span><span class="rot-ref">${refTxt}</span>`;
     if(rotationOpen){
       if(!valid.length){
@@ -2069,7 +2078,7 @@ function renderRotation(){
         const baseName=rotBase==="evren"?"evren ort.":rotBase;
         const colhead=`<div class="rot-row rot-colhead">
           <span class="rot-name">Sektör</span><div class="rot-track"></div>
-          <span class="rot-ret">${rotationWin==="1H"?"1H":"1A"} getiri</span>
+          <span class="rot-ret">${esc(rotationWin)} getiri</span>
           ${isCmp?`<span class="rot-exc">vs ${esc(baseName)}</span>`:""}
           <span class="rot-meta">hisse</span>
         </div>`;
@@ -2544,13 +2553,15 @@ function showFonContent(){
 }
 function fmtTL(v){if(!v)return "0";const a=Math.abs(v);if(a>=1e9)return (v/1e9).toFixed(2)+" Mr₺";if(a>=1e6)return (v/1e6).toFixed(1)+" M₺";if(a>=1e3)return Math.round(v/1e3)+" B₺";return Math.round(v)+" ₺";}
 function shortSec(s){s=(s||"").replace(/\s*\(.*?\)\s*/g,"").trim();return s.length>22?s.slice(0,21)+"…":s;}
-let fonRetMode="cost"; // "cost" = alış maliyetine göre, "1w"/"1m"/"3m" = piyasa penceresi
-const FON_RET_LBL={cost:"alış maliyetine göre","1w":"son ~1 hafta piyasa","1m":"son ~1 ay piyasa","3m":"son ~3 ay piyasa"};
-const FON_RET_TAG={cost:"alış","1w":"1hafta","1m":"1ay","3m":"3ay"};
+let fonRetMode="cost"; // "cost" = alış maliyetine göre, "1d"/"1w"/"1m"/"3m" = piyasa penceresi
+const FON_RET_LBL={cost:"alış maliyetine göre","1d":"son işlem günü piyasa","1w":"son ~1 hafta piyasa","1m":"son ~1 ay piyasa","3m":"son ~3 ay piyasa"};
+const FON_RET_TAG={cost:"alış","1d":"1gün","1w":"1hafta","1m":"1ay","3m":"3ay"};
 function fonHoldRet(h){
   if(fonRetMode==="cost"){const cr=h.costRet;if(!cr)return null;return (fonFund!=="ALL"?cr[fonFund]:cr.ALL);}
-  const k=fonRetMode==="1w"?"ret1w":(fonRetMode==="1m"?"ret1m":"ret3m");
-  return (h[k]!=null?h[k]:null);
+  const k={"1d":"ret1d","1w":"ret1w","1m":"ret1m","3m":"ret3m"}[fonRetMode];
+  if(h[k]!=null)return h[k];
+  if(fonRetMode==="1d"&&h.market==="ABD"){const q=quoteOf(h.ticker);if(q&&q.ccy!=="TRY"&&q.changePct!=null)return q.changePct;} // eski dosyada ret1d yoksa canlı veri
+  return null;
 }
 function fonReturnGroups(){
   // Seçili fona (fonFund) göre hisseleri sektöre grupla; seçili moda göre getiri + ağırlık.
@@ -2623,7 +2634,7 @@ function fonPrintSummary(){
   let dt="";try{dt=new Date().toLocaleDateString("tr-TR");}catch(e){}
   const rcell=v=>v==null?"—":`<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${(Math.abs(v)>=10?Math.round(v):v.toFixed(1))}%</span>`;
   const modeLbl=FON_RET_LBL[fonRetMode];
-  const retHdr={cost:"Alış Getirisi","1w":"1 Hafta","1m":"1 Ay","3m":"3 Ay"}[fonRetMode];
+  const retHdr={cost:"Alış Getirisi","1d":"1 Gün","1w":"1 Hafta","1m":"1 Ay","3m":"3 Ay"}[fonRetMode];
   const totC=garr.reduce((s,g)=>s+(g.contrib||0),0);
   // dağılım donut'u (seçili kapsam)
   const alloc=fonAllocCombined(keys);let ci=0;
@@ -2714,8 +2725,11 @@ function renderFon(){
       <option value="ALL"${fonFund==="ALL"?" selected":""}>Birleşik (${fundKeys.join("+")})</option>
       ${fundKeys.map(k=>`<option value="${esc(k)}"${fonFund===k?" selected":""}>${esc(k)}</option>`).join("")}
     </select>
+    ${FON_YAB_FUNDS.includes(fonFund)?`<span class="fon-retmode"><button class="rmbtn ${fonView!=="yabanci"?"on":""}" data-fonview="genel">Genel</button><button class="rmbtn ${fonView==="yabanci"?"on":""}" data-fonview="yabanci">🌍 ${esc(fonFund)} Yabancı Analizi</button></span>`:""}
     <span class="news-meta">${fonData.asOf?("portföy "+esc(fonData.asOf)):""}${upd?(" · güncelleme "+esc(upd)):""}</span></div>`;
-  document.getElementById("fonFundSel").onchange=function(){fonFund=this.value;renderFon();};
+  document.getElementById("fonFundSel").onchange=function(){fonFund=this.value;if(!FON_YAB_FUNDS.includes(fonFund))fonView="genel";renderFon();};
+  ctl.querySelectorAll("[data-fonview]").forEach(b=>b.onclick=()=>{fonView=b.dataset.fonview;renderFon();body.scrollTop=0;});
+  if(fonView==="yabanci"&&FON_YAB_FUNDS.includes(fonFund)){renderFonYabanci(body,fonFund);return;}
 
   // --- fon özet kartları (tıklayınca o fona odaklan) ---
   let html=`<div class="fon-cards">`+fundKeys.map(k=>{const f=funds[k];return `<div class="fon-card${fonFund===k?" active":""}" data-fon-fund="${esc(k)}" title="${esc(k)} fonuna odaklan">
@@ -2756,7 +2770,7 @@ function renderFon(){
   const maxAbs=Math.max(1,...garr.map(g=>Math.abs(g.avg||0)));
   const modeLbl=FON_RET_LBL[fonRetMode],retTag=FON_RET_TAG[fonRetMode];
   const totContrib=garr.reduce((s,g)=>s+(g.contrib||0),0);
-  const rmBtns=[["cost","Alış getirisi"],["1w","1 Hafta"],["1m","1 Ay"],["3m","3 Ay"]]
+  const rmBtns=[["cost","Alış getirisi"],["1d","1 Gün"],["1w","1 Hafta"],["1m","1 Ay"],["3m","3 Ay"]]
     .map(m=>`<button class="rmbtn ${fonRetMode===m[0]?"on":""}" data-retmode="${m[0]}">${m[1]}</button>`).join("");
   html+=`<div class="fon-sec-h">Sektör Bazında Getiri
     <span class="fon-retmode">${rmBtns}</span>
@@ -2810,8 +2824,143 @@ function renderFon(){
 
   body.innerHTML=html;
   body.querySelectorAll("[data-fon-tk]").forEach(el=>el.onclick=()=>{closeFon();openNews(el.getAttribute("data-fon-tk"));});
-  body.querySelectorAll("[data-fon-fund]").forEach(el=>el.onclick=()=>{const k=el.getAttribute("data-fon-fund");fonFund=(fonFund===k?"ALL":k);renderFon();});
+  body.querySelectorAll("[data-fon-fund]").forEach(el=>el.onclick=()=>{const k=el.getAttribute("data-fon-fund");fonFund=(fonFund===k?"ALL":k);if(!FON_YAB_FUNDS.includes(fonFund))fonView="genel";renderFon();});
   body.querySelectorAll("[data-retmode]").forEach(el=>el.onclick=()=>{fonRetMode=el.getAttribute("data-retmode");renderFon();});
+}
+/* ---------- Fon Yabancı Analizi (BVV) — fonun yurt dışı kısmı ---------- */
+const FON_YAB_FUNDS=["BVV"];      // yabancı analizi sekmesi görünen fonlar
+let fonView="genel";              // genel | yabanci
+let yabWin="1d", yabRotWin="1d", yabRotBase="SPY";
+const YAB_WIN=[["1d","1 Gün"],["1w","1 Hafta"],["1m","1 Ay"],["3m","3 Ay"],["cost","Alış"]];
+const YAB_ROT_WIN=[["1d","1 Gün",1],["1w","1 Hafta",5],["1m","1 Ay",21]];
+const YAB_ROT_BASE=[["SPY","SPY"],["QQQ","QQQ"],["evren","Evren"],["mutlak","Mutlak"]];
+function yabTk(h){return (h.ticker||"").replace(/\s+(US|LI|LN)$/i,"").toUpperCase();}
+function yabIsCash(h){return h.kind==="other"&&(h.ticker||"").toUpperCase()===(h.market||"").toUpperCase();}  // USD / EUR nakit
+function yabIsForeign(h){return !!h.market&&h.market!=="TR";}
+function yabSecOf(r){return r.h.sector||tickerSectorName(r.tk)||"Takip edilmiyor";}
+// Seçili pencerede getiri: önce canlı piyasa verisi (piyasa-verileri.json), yoksa fon dosyasındaki değer.
+function yabRet(h,fk,w){
+  if(w==="cost")return (h.costRet&&h.costRet[fk]!=null)?h.costRet[fk]:null;
+  const q=quoteOf(yabTk(h));
+  if(q&&q.ccy!=="TRY"){
+    if(w==="1d"&&q.changePct!=null)return q.changePct;
+    const n={"1w":5,"1m":21,"3m":63}[w];
+    if(n&&q.hist&&q.hist.c){const r=winReturn(q.hist.c,n);if(r!=null)return r;}
+  }
+  const v=h[{"1d":"ret1d","1w":"ret1w","1m":"ret1m","3m":"ret3m"}[w]];
+  return v!=null?v:null;
+}
+function yabData(fk){
+  const f=(fonData.funds||{})[fk]||{},tot=f.total||0;
+  const rows=[];let cashPct=0,cashTl=0;
+  (fonData.holdings||[]).forEach(h=>{
+    const tl=h.funds&&h.funds[fk];if(!tl||!yabIsForeign(h))return;
+    const p=(h.pct&&h.pct[fk]!=null)?h.pct[fk]:(tot?tl/tot*100:0);
+    if(yabIsCash(h)){cashPct+=p;cashTl+=tl;return;}
+    rows.push({h,tk:yabTk(h),tl,wF:p,etf:h.kind!=="equity"});
+  });
+  const invPct=rows.reduce((a,r)=>a+r.wF,0);
+  rows.forEach(r=>{r.wY=invPct?r.wF/invPct*100:0;});
+  rows.sort((a,b)=>b.wF-a.wF);
+  return {tot,rows,invPct,invTl:rows.reduce((a,r)=>a+r.tl,0),cashPct,cashTl};
+}
+function yabSectors(D,fk,w){
+  const g={};
+  D.rows.forEach(r=>{const s=yabSecOf(r);const o=g[s]||(g[s]={sec:s,items:[],wF:0,num:0,den:0});
+    const v=yabRet(r.h,fk,w);o.items.push({r,v});o.wF+=r.wF;if(v!=null){o.num+=r.wF*v;o.den+=r.wF;}});
+  return Object.values(g).map(o=>{o.ret=o.den?o.num/o.den:null;o.wY=D.invPct?o.wF/D.invPct*100:0;o.contrib=o.num/100;
+    o.items.sort((a,b)=>b.r.wF-a.r.wF);return o;})
+    .sort((a,b)=>(b.ret==null?-1e9:b.ret)-(a.ret==null?-1e9:a.ret));
+}
+function yabPct(v,d){if(v==null)return `<span style="color:var(--faint)">—</span>`;d=d==null?1:d;return `<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${v.toFixed(d)}%</span>`;}
+function yabPts(v){return `<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${v.toFixed(2)}p</span>`;}
+function yabBtns(list,cur,attr){return `<span class="fon-retmode" style="margin-left:0">${list.map(x=>`<button class="rmbtn ${cur===x[0]?"on":""}" ${attr}="${x[0]}">${x[1]}</button>`).join("")}</span>`;}
+// Sektör rotasyonu (ana sayfadaki hesap) × fonun yabancı maruziyeti
+function yabRotHtml(D){
+  if(!priceData||!priceData.quotes)return `<div class="fon-empty" style="padding:14px">Rotasyon için piyasa verisi gerekli — GitHub'a bağlan.</div>`;
+  const days=(YAB_ROT_WIN.find(x=>x[0]===yabRotWin)||YAB_ROT_WIN[0])[2];
+  const R=sectorRotation(days,yabRotBase);
+  const expo={};D.rows.forEach(r=>{const s=yabSecOf(r);expo[s]=(expo[s]||0)+r.wF;});
+  const thr=days===1?0.5:(days===5?1:2);   // "belirgin ayrışma" eşiği (puan)
+  const valid=R.rows.filter(r=>r.ret!=null).sort((a,b)=>b.rel-a.rel);
+  if(!valid.length)return `<div class="fon-empty" style="padding:14px">Rotasyon için fiyat geçmişi yok.</div>`;
+  const isCmp=yabRotBase!=="mutlak";
+  const baseName=R.baseMissing?"evren ort.":(yabRotBase==="evren"?"evren ort.":yabRotBase);
+  const status=(rel,w)=>{
+    if(!isCmp)return ["dim",""];
+    if(rel>=thr)return w>0?["pos","🟢 Pozitif ayrışma · taşıyoruz"]:["opp","⭐ Pozitif ayrışma · portföyde yok"];
+    if(rel<=-thr)return w>0?["neg","🔴 Negatif ayrışma · maruziyet var"]:["dim","Negatif ayrışma · portföyde yok"];
+    return ["dim","Nötr"];
+  };
+  const opp=valid.filter(r=>isCmp&&r.rel>=thr&&!(expo[r.sec.name]>0));
+  const risk=valid.filter(r=>isCmp&&r.rel<=-thr&&expo[r.sec.name]>0);
+  const chip=r=>`<span class="fon-chip"><span class="fc-tk">${esc(shortSec(r.sec.name))}</span> ${r.rel>=0?"+":""}${r.rel.toFixed(1)}p</span>`;
+  let hl="";
+  if(opp.length)hl+=`<div class="tr-hl">⭐ <b>Pozitif ayrışıyor, ${esc(fonFund)}'de yok:</b> ${opp.map(chip).join("")}</div>`;
+  if(risk.length)hl+=`<div class="tr-hl">🔴 <b>Negatif ayrışıyor, ${esc(fonFund)}'de var:</b> ${risk.map(r=>chip(r)+`<span class="fon-sub-lbl">%${expo[r.sec.name].toFixed(1)} fon</span>`).join(" ")}</div>`;
+  if(isCmp&&!hl)hl=`<div class="fon-sub-lbl">Bu pencerede ±${thr} puanı aşan belirgin bir ayrışma yok.</div>`;
+  const maxAbs=Math.max(0.01,...valid.map(r=>Math.abs(r.rel)));
+  const rows=valid.map(r=>{
+    const w=expo[r.sec.name]||0,[sc,st]=status(r.rel,w),pos=r.rel>=0,bw=Math.abs(r.rel)/maxAbs*50;
+    const bar=`<div class="rot-track" style="min-width:140px"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${pos?`left:50%;width:${bw}%`:`left:${50-bw}%;width:${bw}%`}"></div></div>`;
+    return `<tr class="${w>0?"yab-held":""}"><td>${esc(r.sec.name)}</td><td>${bar}</td>
+      <td class="r">${yabPct(r.ret)}</td>${isCmp?`<td class="r"><b class="${pos?"up":"down"}">${pos?"+":""}${r.rel.toFixed(1)}</b></td>`:""}
+      <td class="r" style="color:var(--faint)">${r.n}h·${r.breadth}%↑</td>
+      <td class="r">${w>0?`%${w.toFixed(1)}`:`<span style="color:var(--faint)">—</span>`}</td>
+      <td>${st?`<span class="yab-st ${sc}">${st}</span>`:""}</td></tr>`;
+  }).join("");
+  const miss=R.baseMissing?`<div class="fon-sub-lbl">${esc(yabRotBase)} verisi yok — evren ortalamasına göre gösteriliyor.</div>`:"";
+  return `<div class="yab-hls">${hl}</div>${miss}
+    <table class="fon-tbl"><thead><tr><th>Sektör</th><th>${isCmp?"Ayrışma":"Getiri"}</th><th class="r">Getiri</th>${isCmp?`<th class="r">vs ${esc(baseName)}</th>`:""}<th class="r">hisse·↑</th><th class="r">${esc(fonFund)} yab. ağ.</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="fon-sub-lbl" style="margin-top:8px">Ana sayfadaki Sektör Rotasyonu ile aynı hesap: takip listendeki hisselerin eşit ağırlıklı getirisi. Sol çizgili satırlar = ${esc(fonFund)}'nin yabancı kısmında pozisyon olan sektörler. Ağırlık = fon içindeki %.</div>`;
+}
+function renderFonYabanci(body,fk){
+  const D=yabData(fk);
+  if(!D.rows.length&&!D.cashPct){body.innerHTML=`<div class="fon-empty">${esc(fk)} fonunda yabancı pozisyon yok.</div>`;return;}
+  const winLbl=(YAB_WIN.find(x=>x[0]===yabWin)||YAB_WIN[0])[1];
+  const secs=yabSectors(D,fk,yabWin);
+  const tot=secs.reduce((a,s)=>a+s.contrib,0),den=secs.reduce((a,s)=>a+(s.ret!=null?s.wF:0),0);
+  const wRet=den?tot*100/den:null;    // yabancı kısmın ağırlıklı getirisi
+  const nEq=D.rows.filter(r=>!r.etf).length,nEtf=D.rows.length-nEq;
+  const eqPct=D.rows.filter(r=>!r.etf).reduce((a,r)=>a+r.wF,0),etfPct=D.invPct-eqPct;
+  const yabPctAll=D.invPct+D.cashPct;
+  let html=`<div class="fon-cards">
+    <div class="fon-card" style="cursor:default"><div class="fc-name">YABANCI KISIM</div><div class="fc-tot">%${yabPctAll.toFixed(1)}</div><div class="fc-sub">${fmtTL(D.invTl+D.cashTl)} · fonun yurt dışı payı</div></div>
+    <div class="fon-card" style="cursor:default"><div class="fc-name">HİSSE${nEtf?" + ETF":""}</div><div class="fc-tot">%${D.invPct.toFixed(1)}</div><div class="fc-sub">${nEq} hisse${nEtf?` %${eqPct.toFixed(1)} · ${nEtf} ETF %${etfPct.toFixed(1)}`:""}</div></div>
+    <div class="fon-card" style="cursor:default"><div class="fc-name">DÖVİZ NAKİT</div><div class="fc-tot">%${D.cashPct.toFixed(1)}</div><div class="fc-sub">${fmtTL(D.cashTl)}</div></div>
+    <div class="fon-card" style="cursor:default"><div class="fc-name">GETİRİ · ${esc(winLbl.toUpperCase())}</div><div class="fc-tot">${yabPct(wRet,2)}</div><div class="fc-sub">ağırlıklı · fona katkı ${yabPts(tot)}</div></div>
+  </div>`;
+  // --- sektör bazında getiri (yabancı kısım) ---
+  const maxAbs=Math.max(1,...secs.map(s=>Math.abs(s.ret||0)));
+  html+=`<div class="fon-sec-h">Sektör Bazında Getiri — Yabancı ${yabBtns(YAB_WIN,yabWin,"data-yabwin")}
+    <span class="fon-sub-lbl">· ağırlıklı getiri · ağırlık = yabancı kısım içindeki pay · katkı = fona puan</span></div>`;
+  html+=`<div class="fon-retchart">`+secs.map(g=>{
+    const v=g.ret,has=v!=null,pos=has&&v>=0,bh=has?Math.round(Math.abs(v)/maxAbs*64):0;
+    const bar=has?`<div class="rc-bar ${pos?"up":"down"}" style="height:${bh}px;${pos?"bottom":"top"}:71px"></div>`:"";
+    const val=has?`<div class="rc-val ${pos?"up":"down"}">${pos?"+":""}${v.toFixed(Math.abs(v)<10?1:0)}%</div>`:`<div class="rc-val flat">—</div>`;
+    const tks=g.items.map(({r,v})=>{const cls=v==null?"flat":(v>=0?"up":"down");
+      return `<span class="rc-tk ${cls}" data-yabtk="${esc(r.tk)}" title="${esc(r.tk)} · fon %${r.wF.toFixed(2)} · yabancı %${r.wY.toFixed(1)}"><span>${esc(r.tk)}</span><span>${v!=null?(v>=0?"+":"")+v.toFixed(1)+"%":"–"}</span></span>`;}).join("");
+    return `<div class="rc-col"><div class="rc-plot">${bar}</div>${val}<div class="rc-name">${esc(shortSec(g.sec))}<span class="rc-w">%${g.wY.toFixed(1)} yab. · ${yabPts(g.contrib)}</span></div><div class="rc-tks">${tks}</div></div>`;
+  }).join("")+`</div>`;
+  // --- sektör rotasyonu × maruziyet ---
+  html+=`<div class="fon-sec-h">🔄 Sektör Rotasyonu × ${esc(fk)} ${yabBtns(YAB_ROT_WIN,yabRotWin,"data-yabrw")} <span class="fon-sub-lbl">kıyas</span> ${yabBtns(YAB_ROT_BASE,yabRotBase,"data-yabrb")}</div>`;
+  html+=yabRotHtml(D);
+  // --- pozisyonlar ---
+  const rows=D.rows.map(r=>{const c=yabRet(r.h,fk,yabWin);
+    return `<tr><td><span class="ft-tk ${quoteOf(r.tk)&&histOf(r.tk)?"link":"untracked"}" data-yabtk="${esc(r.tk)}">${esc(r.tk)}</span>${r.etf?`<span class="fon-mkt">ETF</span>`:""}</td>
+      <td style="color:var(--muted)">${esc(r.h.name||"")}</td><td style="color:var(--muted)">${esc(shortSec(yabSecOf(r)))}</td>
+      <td class="r">%${r.wF.toFixed(2)}</td><td class="r">%${r.wY.toFixed(1)}</td>
+      <td class="r">${yabPct(yabRet(r.h,fk,"1d"))}</td><td class="r">${yabPct(yabRet(r.h,fk,"1w"))}</td><td class="r">${yabPct(yabRet(r.h,fk,"1m"))}</td><td class="r">${yabPct(yabRet(r.h,fk,"cost"))}</td>
+      <td class="r">${c!=null?yabPts(r.wF*c/100):"—"}</td></tr>`;}).join("");
+  html+=`<div class="fon-sec-h">Yabancı Pozisyonlar <span class="fon-sub-lbl">· ${D.rows.length} pozisyon · katkı = ${esc(winLbl)}</span></div>
+    <div style="overflow-x:auto"><table class="fon-tbl"><thead><tr><th>Ticker</th><th>Şirket</th><th>Sektör</th><th class="r">Fon %</th><th class="r">Yabancı %</th><th class="r">1G</th><th class="r">1H</th><th class="r">1A</th><th class="r">Alış</th><th class="r">Katkı</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="fon-sub-lbl" style="margin-top:10px">Getiriler canlı piyasa verisinden (Prizma fiyat güncellemesi), yoksa fon dosyasından (${esc(fonData.asOf||"")}). Alış = ortalama maliyete göre. Yabancı kısım = yurt dışı hisse/ETF + döviz nakit; döviz forward ve TR varlıklar hariç.</div>`;
+  body.innerHTML=html;
+  body.querySelectorAll("[data-yabwin]").forEach(b=>b.onclick=()=>{yabWin=b.dataset.yabwin;renderFon();});
+  body.querySelectorAll("[data-yabrw]").forEach(b=>b.onclick=()=>{yabRotWin=b.dataset.yabrw;renderFon();});
+  body.querySelectorAll("[data-yabrb]").forEach(b=>b.onclick=()=>{yabRotBase=b.dataset.yabrb;renderFon();});
+  body.querySelectorAll("[data-yabtk]").forEach(el=>el.onclick=()=>{const t=el.dataset.yabtk;if(!histOf(t)){flash(t+" için grafik verisi yok");return;}
+    document.getElementById("chartModal").style.zIndex="95";openChart(t);});
 }
 /* ---------- Haftalık Sektör Bülteni (Rotasyon) ---------- */
 function openTarama(){document.getElementById("taramaModal").hidden=false;renderTarama();if(!taramaData&&ghReady())ghLoadTarama().then(()=>{if(!document.getElementById("taramaModal").hidden)renderTarama();}).catch(()=>{});}
