@@ -3131,6 +3131,25 @@ function yabRotHtml(D,fk,X){
 }
 /* ===== Haftalık Rotasyon Sepeti (rotasyon-sepet.json) ===== */
 const SEPET_L=[["1","1 hafta"],["4","1 ay"],["12","3 ay"]];
+let sepetBtPer="all", sepetBtWeek="";
+// Haftalık getiri listesinden istatistik (yüzde cinsinden girdiler)
+function sepetStats(W){
+  const out={};
+  ["etf","stock","etfAll","uni","spy","qqq"].forEach(k=>{
+    const r=W.map(w=>w[k]).filter(v=>v!=null).map(v=>v/100);if(r.length<2){out[k]=null;return;}
+    let eq=1,pk=1,dd=0;r.forEach(x=>{eq*=1+x;pk=Math.max(pk,eq);dd=Math.min(dd,eq/pk-1);});
+    const m=r.reduce((a,b)=>a+b,0)/r.length,sd=Math.sqrt(r.reduce((a,b)=>a+(b-m)*(b-m),0)/(r.length-1));
+    const yrs=r.length/52,ann=eq>0?(Math.pow(eq,1/yrs)-1)*100:null;
+    let hit=null;if(k==="etf"||k==="stock"){const b=W.filter(w=>w[k]!=null&&w.spy!=null);hit=b.length?Math.round(b.filter(w=>w[k]>w.spy).length/b.length*100):null;}
+    out[k]={cum:(eq-1)*100,ann:r.length>=8?ann:null,vol:sd*Math.sqrt(52)*100,sharpe:sd?m*52/(sd*Math.sqrt(52)):null,maxDD:dd*100,hit};
+  });
+  return out;
+}
+function sepetCurveOf(W){
+  const c={d:W.length?[W[0].d].concat(W.map(w=>w.end)):[]};
+  ["etf","stock","etfAll","spy"].forEach(k=>{let e=100;c[k]=[100].concat(W.map(w=>(e*=1+(w[k]||0)/100,Math.round(e*100)/100)));});
+  return c;
+}
 function sepetKey(){return "L"+(yabSleeve.L||4)+"N"+(yabSleeve.n||3);}
 function fmtDM(d){return d?d.slice(8,10)+"."+d.slice(5,7):"";}
 // Cuma kapanışından (giriş) bu yana canlı getiri: Prizma fiyat verisinden
@@ -3195,27 +3214,46 @@ function yabSleeveHtml(D,fk,X){
       log.map(e=>`<tr><td style="white-space:nowrap;font-family:var(--mono)">${fmtDM(e.d)} → ${fmtDM(e.end)}</td><td>${e.picks.map(p=>`<span class="fon-chip"><span class="fc-tk">${esc(p.etf||"—")}</span> ${esc(shortSec(p.sector))}</span>`).join("")}</td>
         <td class="r">${yabPct(e.etf)}</td><td class="r">${yabPct(e.stock)}</td><td class="r">${yabPct(e.spy)}</td><td class="r">${e.etf!=null&&e.spy!=null?yabPct(e.etf-e.spy):"—"}</td></tr>`).join("")}</tbody></table></div>`;
   }
-  // backtest
-  const st=V.stats,rows=[["etf","ETF rotasyonu","#6FA2CE"],["stock","Hisse rotasyonu","#E9A53C"],["etfAll","Tüm sektör ETF'leri (eşit ağ.)","#9FB87A"],["uni","Takip evreni (eşit ağ.)","#8B93A0"],["spy","SPY","#C77FA0"],["qqq","QQQ","#7E8AA0"]];
+  // backtest — dönem seçimi istemci tarafında (weeks verisinden)
+  const allW=V.weeks||[];
+  const lastEnd=allW.length?allW[allW.length-1].end:"";
+  const mAgo=m=>{const d=new Date(lastEnd);d.setMonth(d.getMonth()-m);return d.toISOString().slice(0,10);};
+  const PER={all:["Tümü",""],ytd:["2026 başı","2026-01-01"],m6:["Son 6 ay",lastEnd?mAgo(6):""],m3:["Son 3 ay",lastEnd?mAgo(3):""]};
+  const perKey=PER[sepetBtPer]?sepetBtPer:"all",from=PER[perKey][1];
+  const W=allW.filter(w=>!from||w.d>=from);
+  const st=sepetStats(W),rows=[["etf","ETF rotasyonu","#6FA2CE"],["stock","Hisse rotasyonu","#E9A53C"],["etfAll","Tüm sektör ETF'leri (eşit ağ.)","#9FB87A"],["uni","Takip evreni (eşit ağ.)","#8B93A0"],["spy","SPY","#C77FA0"],["qqq","QQQ","#7E8AA0"]];
   const sc=v=>v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"%";
-  html+=`<div class="fon-sec-h">🧪 Geriye Dönük Test — ${esc(key.replace("L","sinyal ").replace("N"," hf · ")+" sektör")} <span class="fon-sub-lbl">· ${st.etf?st.etf.weeks:0} hafta · haftalık yeniden dengeleme</span></div>
-    <div style="overflow-x:auto"><table class="fon-tbl"><thead><tr><th>Strateji</th><th class="r">Kümülatif</th><th class="r">Yıllık</th><th class="r">Oynaklık</th><th class="r">Sharpe</th><th class="r">Maks. düşüş</th><th class="r">SPY'ı geçtiği hafta</th></tr></thead><tbody>${
-    rows.map(([k,n,c])=>{const x=st[k];if(!x)return "";const hit=k==="etf"?st.hitEtf:(k==="stock"?st.hitStock:null);
-      return `<tr><td><span style="display:inline-block;width:10px;height:3px;background:${c};vertical-align:middle;margin-right:7px;border-radius:2px"></span>${n}</td><td class="r">${sc(x.cum)}</td><td class="r"><b>${sc(x.ann)}</b></td><td class="r">%${x.vol}</td><td class="r">${x.sharpe}</td><td class="r"><span class="down">${x.maxDD}%</span></td><td class="r">${hit!=null?"%"+hit:"—"}</td></tr>`;}).join("")}</tbody></table></div>
+  html+=`<div class="fon-sec-h">🧪 Geriye Dönük Test — ${esc(key.replace("L","sinyal ").replace("N"," hf · ")+" sektör")} ${yabBtns(Object.entries(PER).map(([k,v])=>[k,v[0]]),perKey,"data-btper")}
+      <span class="fon-sub-lbl">· ${W.length} hafta${W.length?` · ${fmtDM(W[0].d)}.${W[0].d.slice(2,4)} → ${fmtDM(lastEnd)}.${lastEnd.slice(2,4)}`:""}</span></div>
+    <div style="overflow-x:auto"><table class="fon-tbl"><thead><tr><th>Strateji</th><th class="r">Dönem getirisi</th><th class="r">Yıllık</th><th class="r">Oynaklık</th><th class="r">Sharpe</th><th class="r">Maks. düşüş</th><th class="r">SPY'ı geçtiği hafta</th></tr></thead><tbody>${
+    rows.map(([k,n,c])=>{const x=st[k];if(!x)return "";
+      return `<tr><td><span style="display:inline-block;width:10px;height:3px;background:${c};vertical-align:middle;margin-right:7px;border-radius:2px"></span>${n}</td><td class="r"><b>${sc(x.cum)}</b></td><td class="r">${sc(x.ann)}</td><td class="r">%${x.vol.toFixed(1)}</td><td class="r">${x.sharpe!=null?x.sharpe.toFixed(2):"—"}</td><td class="r"><span class="down">${x.maxDD.toFixed(1)}%</span></td><td class="r">${x.hit!=null?"%"+x.hit:"—"}</td></tr>`;}).join("")}</tbody></table></div>
     <canvas id="sepetCurve" style="display:block;width:100%;margin-top:10px;border:1px solid var(--line-cool);border-radius:10px"></canvas>
-    <div class="fon-sub-lbl" style="margin-top:4px">100'den başlayan kümülatif değer (log ölçek) · mavi = ETF rotasyonu · turuncu = hisse rotasyonu · yeşil kesikli = tüm sektör ETF'leri · pembe = SPY</div>`;
-  // varyant karşılaştırma ızgarası
+    <div class="fon-sub-lbl" style="margin-top:4px">Seçili dönemin başında 100 ile başlayan kümülatif değer (log ölçek) · mavi = ETF rotasyonu · turuncu = hisse rotasyonu · yeşil kesikli = tüm sektör ETF'leri · pembe = SPY</div>`;
+  // varyant karşılaştırma ızgarası (seçili dönemde)
   const vs=sepetData.variants,Ls=sepetData.lookbacks||[1,4,12],Ns=sepetData.ns||[2,3,4];
-  html+=`<div class="fon-sec-h" style="margin-top:16px">Ayar karşılaştırması <span class="fon-sub-lbl">· yıllık getiri ETF / hisse · tıkla → seç</span></div>
+  html+=`<div class="fon-sec-h" style="margin-top:16px">Ayar karşılaştırması <span class="fon-sub-lbl">· ${esc(PER[perKey][0])} · dönem getirisi ETF / hisse · tıkla → seç</span></div>
     <table class="fon-tbl" style="max-width:640px"><thead><tr><th>Sinyal \\ Sektör</th>${Ns.map(n=>`<th class="r">${n} sektör</th>`).join("")}</tr></thead><tbody>${
     Ls.map(l=>`<tr><td>${l===1?"1 hafta":l===4?"1 ay":"3 ay"}</td>${Ns.map(n=>{const v=vs["L"+l+"N"+n];if(!v)return "<td></td>";const on=("L"+l+"N"+n)===key;
-      return `<td class="r" data-slv="${l},${n}" style="cursor:pointer;${on?"background:rgba(233,165,60,.12);":""}">${sc(v.stats.etf&&v.stats.etf.ann)} <span style="color:var(--faint)">/ ${sc(v.stats.stock&&v.stats.stock.ann)}</span></td>`;}).join("")}</tr>`).join("")}</tbody></table>
-    <div class="fon-sub-lbl" style="margin-top:4px">Kıyas: tüm sektör ETF'leri eşit ağırlık ${sc(V.stats.etfAll&&V.stats.etfAll.ann)} · SPY ${sc(V.stats.spy&&V.stats.spy.ann)} yıllık.</div>`;
-  // son haftaların backtest seçimleri
-  const wk=(V.weeks||[]).slice(-8).reverse();
-  html+=`<details style="margin-top:12px"><summary class="fon-sub-lbl" style="cursor:pointer">Backtest — son 8 haftanın seçimleri</summary>
-    <table class="fon-tbl" style="margin-top:6px"><thead><tr><th>Cuma</th><th>Seçilen sektörler</th><th class="r">ETF</th><th class="r">Hisse</th><th class="r">SPY</th></tr></thead><tbody>${
-    wk.map(w=>`<tr><td style="font-family:var(--mono)">${fmtDM(w.d)}</td><td>${w.picks.map(x=>esc(shortSec(x))).join(" · ")}</td><td class="r">${yabPct(w.etf)}</td><td class="r">${yabPct(w.stock)}</td><td class="r">${yabPct(w.spy)}</td></tr>`).join("")}</tbody></table></details>`;
+      const s2=sepetStats((v.weeks||[]).filter(w=>!from||w.d>=from));
+      return `<td class="r" data-slv="${l},${n}" style="cursor:pointer;${on?"background:rgba(233,165,60,.12);":""}">${sc(s2.etf&&s2.etf.cum)} <span style="color:var(--faint)">/ ${sc(s2.stock&&s2.stock.cum)}</span></td>`;}).join("")}</tr>`).join("")}</tbody></table>
+    <div class="fon-sub-lbl" style="margin-top:4px">Aynı dönemde: tüm sektör ETF'leri ${sc(st.etfAll&&st.etfAll.cum)} · SPY ${sc(st.spy&&st.spy.cum)} · QQQ ${sc(st.qqq&&st.qqq.cum)}.</div>`;
+  // tarih seçerek o haftanın seçimleri
+  const wsel=W.slice().reverse();
+  const curW=wsel.find(w=>w.d===sepetBtWeek)||wsel[0];
+  if(curW){
+    const det=curW.det||[];
+    const opts=wsel.map(w=>`<option value="${w.d}" ${w.d===curW.d?"selected":""}>${fmtDM(w.d)}.${w.d.slice(0,4)} → ${fmtDM(w.end)} · ETF ${sc(w.etf)} · hisse ${sc(w.stock)} · SPY ${sc(w.spy)}</option>`).join("");
+    html+=`<div class="fon-sec-h" style="margin-top:16px">🗓 Haftanın seçimleri <select class="minisel" id="sepetWeekSel" style="margin-left:8px;text-transform:none;letter-spacing:0">${opts}</select></div>
+      <div class="fon-sub-lbl" style="margin:-4px 0 10px">Cuma <b>${fmtDM(curW.d)}.${curW.d.slice(0,4)}</b> kapanışında seçildi → <b>${fmtDM(curW.end)}</b> Cuma kapanışına kadar tutuldu. "Sinyal" = seçim anındaki son ${Lw===1?"1 hafta":Lw===4?"1 ay":"3 ay"} getirisi, "Hafta" = tutulan haftadaki gerçekleşen getiri.</div>
+      <div class="yab-wk"><div><span>ETF sepeti</span><b>${lv(curW.etf)}</b></div><div><span>Hisse sepeti</span><b>${lv(curW.stock)}</b></div><div><span>SPY</span><b>${lv(curW.spy)}</b></div><div><span>QQQ</span><b>${lv(curW.qqq)}</b></div><div><span>Tüm sektör ETF'leri</span><b>${lv(curW.etfAll)}</b></div></div>
+      <div class="yab-sl-grid">${det.map((p,i)=>`<div class="yab-sl-card"><div class="yab-sl-h"><span class="idx">${i+1}</span><b>${esc(p.s)}</b></div>
+        <div class="yab-sl-w"><span>Sinyal</span><b class="${(p.sc||0)>=0?"up":"down"}">${sc(p.sc)}</b><span style="color:var(--muted)">sektör ort.</span></div>
+        <div class="yab-sl-w"><span>ETF</span>${p.e?`<b>${esc(p.e)}</b> ${lv(p.er)}`:`<span style="color:var(--muted)">yok → hisse sepeti</span>`}</div>
+        <div class="yab-sl-w"><span>Hisse ort.</span>${lv(p.sr)}</div>
+        <table class="od-tbl" style="margin-top:6px;width:100%"><thead><tr><th class="l">Hisse</th><th>Sinyal</th><th>Hafta</th></tr></thead><tbody>${
+          (p.st||[]).map(x=>`<tr><td class="l" style="font-family:var(--mono)">${esc(x[0])}</td><td>${sc(x[1])}</td><td>${lv(x[2])}</td></tr>`).join("")}</tbody></table></div>`).join("")}</div>`;
+  }
   html+=`<div class="yab-caveat">⚠️ <b>Backtest nasıl okunmalı:</b> Test bugünkü takip listesiyle yapıldı. Liste geriye dönük seçildiği için (bugün güçlü olan temalar) hisse rotasyonu ve evren rakamları <b>olduğundan iyimser</b>. Rotasyonun gerçek katkısını görmek için ETF rotasyonunu "tüm sektör ETF'leri" satırıyla kıyasla. Asıl ölçü <b>Canlı Kayıt</b>: her Cuma dondurulan sepetin sonraki haftası. Kripto sektörü ve ${(sepetData.excluded&&sepetData.excluded.tickers||[]).join(", ")} izahname gereği hariç. Getiriler USD, temettü düzeltmeli; işlem maliyeti dahil değil.</div>`;
   return html;
 }
@@ -3271,8 +3309,12 @@ function renderFonYabanci(body,fk){
   body.querySelectorAll("[data-sln]").forEach(b=>b.onclick=()=>{yabSleeve.n=+b.dataset.sln;saveYabSleeve();renderFon();});
   body.querySelectorAll("[data-sll]").forEach(b=>b.onclick=()=>{yabSleeve.L=+b.dataset.sll;saveYabSleeve();renderFon();});
   body.querySelectorAll("[data-slv]").forEach(b=>b.onclick=()=>{const [l,n]=b.dataset.slv.split(",");yabSleeve.L=+l;yabSleeve.n=+n;saveYabSleeve();renderFon();});
+  body.querySelectorAll("[data-btper]").forEach(b=>b.onclick=()=>{sepetBtPer=b.dataset.btper;sepetBtWeek="";renderFon();});
+  const wsEl=document.getElementById("sepetWeekSel");if(wsEl)wsEl.onchange=()=>{sepetBtWeek=wsEl.value;const y=body.scrollTop;renderFon();body.scrollTop=y;};
   const sc=document.getElementById("sepetCurve"),SV=sepetData&&sepetData.variants&&sepetData.variants[sepetKey()];
-  if(sc&&SV&&SV.curve)drawSepetCurve(sc,SV.curve,[{k:"etfAll",c:"#9FB87A",dash:[5,4],w:1.3},{k:"spy",c:"#C77FA0",w:1.4},{k:"stock",c:"#E9A53C",w:1.4},{k:"etf",c:"#6FA2CE",w:2.2}]);
+  const PFROM={all:"",ytd:"2026-01-01"};let pf=PFROM[sepetBtPer];
+  if(pf==null&&SV&&SV.weeks&&SV.weeks.length){const d=new Date(SV.weeks[SV.weeks.length-1].end);d.setMonth(d.getMonth()-(sepetBtPer==="m6"?6:3));pf=d.toISOString().slice(0,10);}
+  if(sc&&SV&&SV.weeks)drawSepetCurve(sc,sepetCurveOf(SV.weeks.filter(w=>!pf||w.d>=pf)),[{k:"etfAll",c:"#9FB87A",dash:[5,4],w:1.3},{k:"spy",c:"#C77FA0",w:1.4},{k:"stock",c:"#E9A53C",w:1.4},{k:"etf",c:"#6FA2CE",w:2.2}]);
   body.querySelectorAll("[data-yabtk]").forEach(el=>el.onclick=()=>{const t=el.dataset.yabtk;if(!histOf(t)){flash(t+" için grafik verisi yok");return;}
     document.getElementById("chartModal").style.zIndex="95";openChart(t);});
 }
