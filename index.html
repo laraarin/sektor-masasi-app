@@ -2412,8 +2412,12 @@ function renderTape(){
   if(cos.length){items=cos.map(c=>`<span class="tape-item"><b>${esc(c.ticker)}</b> <span class="nm">${esc(c.name||"")}</span></span>`);}
   else{items=[];}
   if(!items.length)items=['<span class="tape-item nm">şirket eklemeye başla…</span>'];
-  document.getElementById("tape").innerHTML=items.join("")+items.join("");
+  const tr=document.getElementById("tape");
+  tr.innerHTML=items.join("")+items.join("");
+  // hız içerikten bağımsız sabit kalsın: ~TAPE_PX_S piksel/sn (hisse sayısı arttıkça süre uzar)
+  requestAnimationFrame(()=>{const half=tr.scrollWidth/2;if(half>0)tr.style.animationDuration=Math.max(30,half/TAPE_PX_S)+"s";});
 }
+const TAPE_PX_S=35;
 function renderGrid(){
   const q=(document.getElementById("search").value||"").trim().toUpperCase();
   const grid=document.getElementById("grid");grid.innerHTML="";
