@@ -2008,9 +2008,9 @@ function refDates(){
 }
 function heatVal(arr,EXT,g){const off=EXT-arr.length,i=g-off;return (i>=0&&i<arr.length)?arr[i]:null;}
 function heatMom(arr,EXT,g){const a=heatVal(arr,EXT,g-HEAT_MOM),b=heatVal(arr,EXT,g);return (a&&b)?(b/a-1)*100:null;}
-// Ayrışan (diverging) skala: mercan = o günün en zayıfı · sakin arduvaz = orta · yeşil = lider
-const HEAT_STOPS_DARK=[[0,[214,96,74]],[.22,[150,78,68]],[.5,[52,61,73]],[.78,[66,128,96]],[1,[88,190,130]]];
-const HEAT_STOPS_LIGHT=[[0,[200,82,60]],[.25,[226,160,140]],[.5,[236,230,214]],[.75,[140,196,160]],[1,[48,148,98]]];
+// Sıcak skala: mercan = o günün en zayıfı · turuncu · hardal/kehribar = orta · zeytin-yeşil · yeşil = lider
+const HEAT_STOPS_DARK=[[0,[200,84,66]],[.25,[204,122,64]],[.5,[196,158,72]],[.75,[138,164,84]],[1,[76,170,112]]];
+const HEAT_STOPS_LIGHT=[[0,[200,82,60]],[.25,[226,138,86]],[.5,[230,190,108]],[.75,[156,186,104]],[1,[52,148,96]]];
 const HEAT_SMOOTH=5;   // görüntüde günlük titremeyi azaltmak için 5 günlük ortalama
 function heatStops(){return isLight()?HEAT_STOPS_LIGHT:HEAT_STOPS_DARK;}
 function heatRGB(v){
