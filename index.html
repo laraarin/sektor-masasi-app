@@ -502,11 +502,19 @@
   .yab-st.opp{color:var(--accent);border-color:var(--line);background:rgba(233,165,60,.08)}
   .yab-st.neg{color:var(--bad);border-color:rgba(210,101,78,.45)}
   .fon-tbl tr.yab-held td:first-child{box-shadow:inset 3px 0 0 var(--accent-2)}
-  .yab-sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+  .yab-sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
   .yab-sl-card{background:var(--surface);border:1px solid var(--line-cool);border-radius:12px;padding:12px 14px}
   .yab-sl-h{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
   .yab-sl-w{display:flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:12px;padding:2px 0;flex-wrap:wrap}
   .yab-sl-etf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font-family:var(--mono);font-size:12px}
+  .yab-plan{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0 4px}
+  .yab-plan>div{background:var(--ground);border:1px solid var(--line-cool);border-radius:8px;padding:6px 8px;display:flex;flex-direction:column}
+  .yab-plan span{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .yab-plan b{font-family:var(--mono);font-size:14px}
+  .yab-plan em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .yab-plan .add b{color:var(--good)}.yab-plan .cut b{color:var(--bad)}
+  .yab-opt{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line-cool)}
+  .yab-opt-h{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
   .yab-wk{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px}
   .yab-wk>div:not(.fon-sub-lbl){background:var(--surface);border:1px solid var(--line-cool);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:130px}
   .yab-wk>div>span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
@@ -3186,22 +3194,42 @@ function yabSleeveHtml(D,fk,X){
   const lv=v=>v==null?`<span style="color:var(--faint)">—</span>`:yabPct(v);
   // bu haftanın kartları
   const etfL=[],stkL=[];
+  // kur: USD/TRY (Prizma fiyat verisi "TRY=X"); yoksa adet hesaplanmaz
+  const fxQ=quoteOf("TRY=X"),fx=(fxQ&&fxQ.price>5)?fxQ.price:null;
+  const adet=(tl,px)=>(fx&&px)?Math.round(tl/fx/px).toLocaleString("tr-TR"):"—";
+  let totAdd=0;
   const cards=cur.picks.map((p,i)=>{
     const eL=p.etf?sepetLive(p.etf,p.etfPx):null;
     const sL=sepetAvg(p.stocks.map(x=>sepetLive(x.t,x.px)));
     etfL.push(eL!=null?eL:sL);stkL.push(sL);
-    const stocks=p.stocks.map(x=>{const l=sepetLive(x.t,x.px);
-      return `<span class="rc-tk ${l==null?"flat":(l>=0?"up":"down")}" data-yabtk="${esc(x.t)}" title="${esc(x.t)} · ${Lw===1?"1 hafta":Lw===4?"1 ay":"3 ay"} momentum %${x.mom} · Cuma ${x.px}${held.has(x.t)?" · "+esc(fk)+"'de var":""}"><span>${esc(x.t)}${held.has(x.t)?" ●":""}</span><span>${l==null?"–":(l>=0?"+":"")+l.toFixed(1)+"%"}</span></span>`;}).join("");
+    // hedef / mevcut / fark — hepsi FON TOPLAM DEĞERİNE göre
+    const tgtTl=D.tot*per/100;
+    const mine=D.rows.filter(r=>yabSecOf(r)===p.sector);
+    const curTl=mine.reduce((a,r)=>a+r.tl,0),curPct=D.tot?curTl/D.tot*100:0;
+    const gapTl=tgtTl-curTl,gapPct=per-curPct;totAdd+=Math.max(0,gapTl);
+    const heldTl=t=>{const r=mine.find(r=>r.tk===t);return r?r.tl:0;};
+    const mineTxt=mine.length?mine.map(r=>`${esc(r.tk)} %${r.wF.toFixed(2)}`).join(" · "):"yok";
+    const each=gapTl/Math.max(1,p.stocks.length);
+    const stockRows=p.stocks.map(x=>{const l=sepetLive(x.t,x.px),h=heldTl(x.t);
+      return `<tr><td class="l"><span class="ft-tk link" data-yabtk="${esc(x.t)}">${esc(x.t)}</span>${h?` <span class="fon-mkt">var ${fmtTL(h)}</span>`:""}</td><td>${x.px!=null?"$"+x.px:"—"}</td><td><b>${gapTl>0?fmtTL(each):"—"}</b></td><td>${gapTl>0?adet(each,x.px):"—"}</td><td>${lv(l)}</td></tr>`;}).join("");
     return `<div class="yab-sl-card"><div class="yab-sl-h"><span class="idx">${i+1}</span><b>${esc(p.sector)}</b></div>
-      <div class="yab-sl-w"><span>Hedef</span><b>%${per.toFixed(1)}</b><span style="color:var(--muted)">${fmtTL(D.tot*per/100)} · mevcut %${(X.expo[p.sector]||0).toFixed(1)}</span></div>
       <div class="yab-sl-w"><span>Sinyal</span><b class="${p.score>=0?"up":"down"}">${p.score>=0?"+":""}${p.score.toFixed(1)}%</b><span style="color:var(--muted)">${p.rel!=null?`SPY'a göre ${p.rel>=0?"+":""}${p.rel.toFixed(1)}p`:""}</span></div>
-      <div class="yab-sl-etf">${p.etf?`<span class="fon-chip" data-yabtk="${esc(p.etf)}" style="cursor:pointer"><span class="fc-tk">${esc(p.etf)}</span> ETF</span> <span class="fon-sub-lbl">sinyal ${p.etfMom!=null?(p.etfMom>=0?"+":"")+p.etfMom.toFixed(1)+"%":"—"} · bu hafta</span> ${lv(eL)}`:`<span class="fon-sub-lbl">Temiz ETF karşılığı yok → hisse sepeti</span>`}</div>
-      <div class="fon-sub-lbl" style="margin:8px 0 4px">Hisse önerisi · bu hafta</div><div class="rc-tks">${stocks}</div></div>`;}).join("");
+      <div class="yab-plan">
+        <div><span>Hedef</span><b>%${per.toFixed(2)}</b><em>${fmtTL(tgtTl)}</em></div>
+        <div><span>Mevcut</span><b>%${curPct.toFixed(2)}</b><em>${fmtTL(curTl)}</em></div>
+        <div class="${gapTl>=0?"add":"cut"}"><span>${gapTl>=0?"Eklenecek":"Fazla"}</span><b>${gapTl>=0?"+":""}%${gapPct.toFixed(2)}</b><em>${gapTl>=0?"+":"−"}${fmtTL(Math.abs(gapTl))}</em></div>
+      </div>
+      <div class="fon-sub-lbl" style="margin:2px 0 8px">mevcut: ${mineTxt} · oranlar fon toplam değerine göre</div>
+      <div class="yab-opt"><div class="yab-opt-h">A · ETF ile</div>${p.etf?`<div class="yab-sl-etf" style="margin-top:4px"><span class="fon-chip" data-yabtk="${esc(p.etf)}" style="cursor:pointer"><span class="fc-tk">${esc(p.etf)}</span></span>
+        <span>${p.etfPx!=null?"$"+p.etfPx:""}</span><b>${gapTl>0?fmtTL(gapTl):"—"}</b><span class="fon-sub-lbl">${gapTl>0?"≈ "+adet(gapTl,p.etfPx)+" adet":""} · sinyal ${p.etfMom!=null?(p.etfMom>=0?"+":"")+p.etfMom.toFixed(1)+"%":"—"} · bu hafta</span> ${lv(eL)}</div>`:`<div class="fon-sub-lbl" style="margin-top:4px">Temiz ETF karşılığı yok → yalnız hisse seçeneği</div>`}</div>
+      <div class="yab-opt"><div class="yab-opt-h">B · Hisse ile (eşit dağıtım)</div>
+        <table class="od-tbl" style="width:100%;margin-top:4px"><thead><tr><th class="l">Hisse</th><th>Cuma</th><th>Tutar</th><th>≈ Adet</th><th>Bu hafta</th></tr></thead><tbody>${stockRows}</tbody></table></div></div>`;}).join("");
   const wkE=sepetAvg(etfL),wkS=sepetAvg(stkL);
   let html=head+`<div class="fon-sub-lbl" style="margin:-4px 0 10px">Seçim: <b>Cuma ${fmtDM(cur.asOf)} kapanışı</b> · sinyal = sektördeki takip hisselerinin son ${Lw===1?"1 hafta":Lw===4?"1 ay":"3 ay"} getirisi (eşit ağırlık) · en güçlü ${N} sektöre eşit ağırlık · dilim ${fmtTL(sleeveTl)} · her Cumartesi sabahı yenilenir ve kaydedilir</div>
     <div class="yab-wk"><div><span>Bu hafta · ETF sepeti</span><b>${lv(wkE)}</b></div><div><span>Bu hafta · Hisse sepeti</span><b>${lv(wkS)}</b></div><div><span>SPY</span><b>${lv(spyLive)}</b></div>
       <div><span>ETF − SPY</span><b>${wkE!=null&&spyLive!=null?yabPct(wkE-spyLive):"—"}</b></div><div class="fon-sub-lbl" style="align-self:center">Cuma ${fmtDM(cur.asOf)} kapanışından bugüne (Prizma fiyat verisi)</div></div>
-    <div class="yab-sl-grid">${cards}</div>`;
+    <div class="yab-sl-grid">${cards}</div>
+    <div class="fon-sub-lbl" style="margin-top:8px">Toplam eklenecek <b>${fmtTL(totAdd)}</b> → yabancı hisse + ETF ≈ <b>%${(D.invPct+(D.tot?totAdd/D.tot*100:0)).toFixed(1)}</b>${FON_LIMITS[fk]?` (izahname %${FON_LIMITS[fk].yabTema[0]}–%${FON_LIMITS[fk].yabTema[1]})`:""} · adetler Cuma kapanışı ve USD/TRY ${fx?fx.toFixed(2):"—"} ile yaklaşık · her sektörde A ya da B seçilir, ikisi birden değil</div>`;
   // canlı kayıt (dondurulmuş haftalar)
   const log=((sepetData.live||{})[key]||[]).filter(e=>e.done).slice().reverse();
   html+=`<div class="fon-sec-h">📒 Canlı Kayıt — her Cuma dondurulan sepetin hafta sonu performansı</div>`;
