@@ -502,10 +502,16 @@
   .yab-st.opp{color:var(--accent);border-color:var(--line);background:rgba(233,165,60,.08)}
   .yab-st.neg{color:var(--bad);border-color:rgba(210,101,78,.45)}
   .fon-tbl tr.yab-held td:first-child{box-shadow:inset 3px 0 0 var(--accent-2)}
-  .yab-sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+  .yab-sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
   .yab-sl-card{background:var(--surface);border:1px solid var(--line-cool);border-radius:12px;padding:12px 14px}
   .yab-sl-h{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
-  .yab-sl-w{display:flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:12px;padding:2px 0}
+  .yab-sl-w{display:flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:12px;padding:2px 0;flex-wrap:wrap}
+  .yab-sl-etf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font-family:var(--mono);font-size:12px}
+  .yab-wk{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+  .yab-wk>div:not(.fon-sub-lbl){background:var(--surface);border:1px solid var(--line-cool);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:130px}
+  .yab-wk>div>span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .yab-wk>div>b{font-family:var(--mono);font-size:16px}
+  .yab-caveat{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(233,165,60,.06);font-size:12px;color:var(--muted);line-height:1.55}
   .yab-sl-w span:first-child{color:var(--faint);width:62px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
   /* haftalık sektör bülteni (rotasyon) */
   .tr-hls{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
@@ -1254,7 +1260,7 @@ async function writeNow(){
   try{const f=await fileHandle.getFile();lastMod=f.lastModified;}catch(e){}
 }
 /* ================= GitHub canlı senkron ================= */
-const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json",akisFile:"sektor_akis.json",raporFiles:{BV1:"bv1-rapor.json",BVD:"bvd-rapor.json"},trHisseFile:"tr-hisse-verileri.json",shortFile:"short-interest.json",optionFile:"option-screening.json"};
+const GH={user:"laraarin",repo:"sektor-masasi",branch:"main",dataFile:"sektor-masasi-veri.json",priceFile:"piyasa-verileri.json",newsFile:"haberler.json",regimeFile:"rejim.json",regimeChartFile:"rejim_spx.png",fonFile:"fon_portfoy.json",taramaFile:"sektor-tarama.json",akisFile:"sektor_akis.json",raporFiles:{BV1:"bv1-rapor.json",BVD:"bvd-rapor.json"},trHisseFile:"tr-hisse-verileri.json",shortFile:"short-interest.json",optionFile:"option-screening.json",sepetFile:"rotasyon-sepet.json"};
 let ghToken=localStorage.getItem("sm-gh-token")||"";
 let dataSha=null, priceCommit=null, newsCommit=null, ghWriteTimer=null, ghPollTimer=null, ghBusy=false;
 let baseState=null, pendingWrite=false, updating=false, updTimer=null;  // merge + güncelle butonu
@@ -1267,7 +1273,8 @@ let akisData=null, akisCommit=null, akisWin="1h";  // sektor_akis.json (ETF fon 
 let trRapors={}, trRaporCommits={};  // fon kodu -> rapor json (fon-rapor-uret.py üretir)
 let trHisseData=null, trHisseCommit=null;  // tr-hisse-verileri.json (TR hisse fiyat/finansal/grafik/özet)
 let shortData=null, shortCommit=null;  // short-interest.json (FINRA ABD + yfinance yabancı; her hisse için short serisi)
-let optData=null, optCommit=null;  // option-screening.json (ABD opsiyon tarama: P/C OI, IV/skew, max pain, sahiplik/insider)
+let optData=null, optCommit=null;
+let sepetData=null, sepetCommit=null;  // rotasyon-sepet.json (haftalık rotasyon sepeti + backtest, rotasyon-sepet.py üretir)  // option-screening.json (ABD opsiyon tarama: P/C OI, IV/skew, max pain, sahiplik/insider)
 function ghReady(){return !!ghToken;}
 function ghHeaders(extra){return Object.assign({Authorization:"Bearer "+ghToken,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"},extra||{});}
 function b64encUtf8(s){const b=new TextEncoder().encode(s);let bin="";for(let i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin);}
@@ -1390,6 +1397,13 @@ async function ghLoadOption(){
   if(txt.trim()){const d=JSON.parse(txt);if(d&&d.items)optData=d;}
   optCommit=await ghLatestCommit(GH.optionFile);
 }
+async function ghLoadSepet(){
+  const r=await ghApi("/contents/"+GH.sepetFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
+  if(!r.ok)return;
+  const txt=await r.text();
+  if(txt.trim()){const d=JSON.parse(txt);if(d&&d.variants)sepetData=d;}
+  sepetCommit=await ghLatestCommit(GH.sepetFile);
+}
 async function ghLoadRegimeChart(){
   const r=await ghApi("/contents/"+GH.regimeChartFile+"?ref="+GH.branch+"&_="+Date.now(),{headers:ghHeaders({Accept:"application/vnd.github.raw"}),cache:"no-store"});
   if(!r.ok)return;
@@ -1448,6 +1462,8 @@ function startGitPoll(){
       const oc=await ghLatestCommit(GH.optionFile);
       if(oc&&oc!==optCommit){await ghLoadOption();if(!document.getElementById("optSheet").hidden)renderOpt();flash("Opsiyon taraması güncellendi");}
       for(const f in GH.raporFiles){const c=await ghLatestCommit(GH.raporFiles[f]);if(c&&c!==trRaporCommits[f]){await ghLoadTRRapor();if(!document.getElementById("trSheet").hidden&&trTab==="fund")renderTRFund();flash(f+" raporu güncellendi");break;}}
+      const spc=await ghLatestCommit(GH.sepetFile);
+      if(spc&&spc!==sepetCommit){await ghLoadSepet();if(!document.getElementById("fonModal").hidden)renderFon();flash("Rotasyon sepeti güncellendi");}
       const thc=await ghLatestCommit(GH.trHisseFile);
       if(thc&&thc!==trHisseCommit){await ghLoadTRHisse();}
     }catch(e){}finally{ghBusy=false;}
@@ -1481,7 +1497,7 @@ function setToken(){
   if(ghToken)localStorage.setItem("sm-gh-token",ghToken);else localStorage.removeItem("sm-gh-token");
   if(!ghToken){renderSrcBar();return;}
   flash("Bağlanılıyor…");
-  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();await ghLoadShort();await ghLoadOption();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
+  (async()=>{try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();await ghLoadShort();await ghLoadOption();await ghLoadSepet();startGitPoll();render(true);flash("GitHub'a bağlandı");}catch(e){flash("Hata: "+e.message);renderSrcBar();}})();
 }
 function startPolling(){
   if(pollTimer)clearInterval(pollTimer);
@@ -3045,7 +3061,7 @@ function yabBtns(list,cur,attr){return `<span class="fon-retmode" style="margin-
 const FON_LIMITS={BVV:{yabTema:[40,70],yabToplam:80,temaDisi:20,
   src:"BVV izahnamesi md. 2.2 — temaya uygun yabancı ortaklık payı/ÖSBA/yabancı BYF %40–70 · yabancı para ve araçlar toplamı %80'in altında · tema dışı ortaklık payları ≤%20 · kripto işlem platformu payları alınamaz"}};
 const YAB_CRYPTO_BAN=["COIN","HOOD","MSTR"];   // izahname: kripto varlık / işlem platformu bağlantılı paylar dahil edilemez
-let yabSleeve={pct:10,n:3};
+let yabSleeve={pct:10,n:3,L:4};
 try{const v=JSON.parse(localStorage.getItem("sm-yab-sleeve")||"null");if(v&&v.pct&&v.n)yabSleeve=v;}catch(e){}
 function saveYabSleeve(){try{localStorage.setItem("sm-yab-sleeve",JSON.stringify(yabSleeve));}catch(e){}}
 const YAB_LOW=1.0;   // fonun %1'inin altı = "ağırlık düşük"
@@ -3113,34 +3129,95 @@ function yabRotHtml(D,fk,X){
     <div style="overflow-x:auto"><table class="fon-tbl"><thead><tr><th>Sektör</th><th>${isCmp?"Ayrışma":"Getiri"}</th><th class="r">Getiri</th>${isCmp?`<th class="r">vs ${esc(baseName)}</th>`:""}<th class="r">hisse·↑</th><th class="r">${esc(fk)}'de bulunma</th><th class="r">${esc(fk)} katkı (${esc(winLbl)})</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="fon-sub-lbl" style="margin-top:8px">Getiri/ayrışma = ana sayfadaki Sektör Rotasyonu (takip listesinin eşit ağırlıklı getirisi). Bulunma = ${esc(fk)}'nin o sektördeki yabancı pozisyonlarının fon içindeki payı · TL · hisse sayısı. Katkı = ${esc(fk)}'nin o sektördeki pozisyonlarının seçili pencerede fona kazandırdığı puan. "Ağırlık düşük" = fonun %${YAB_LOW}'inin altı.</div>`;
 }
-// Fonun bir dilimini (varsayılan %10) rotasyonun öncü sektörlerine dağıtan sepet önerisi
+/* ===== Haftalık Rotasyon Sepeti (rotasyon-sepet.json) ===== */
+const SEPET_L=[["1","1 hafta"],["4","1 ay"],["12","3 ay"]];
+function sepetKey(){return "L"+(yabSleeve.L||4)+"N"+(yabSleeve.n||3);}
+function fmtDM(d){return d?d.slice(8,10)+"."+d.slice(5,7):"";}
+// Cuma kapanışından (giriş) bu yana canlı getiri: Prizma fiyat verisinden
+function sepetLive(tk,px){const q=quoteOf(tk);if(!q||q.price==null||!px)return null;return (q.price/px-1)*100;}
+function sepetAvg(a){const v=a.filter(x=>x!=null);return v.length?v.reduce((s,x)=>s+x,0)/v.length:null;}
+function drawSepetCurve(cv,curve,lines){
+  const dpr=window.devicePixelRatio||1,W=cv.clientWidth||900,H=240;
+  cv.style.height=H+"px";cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext("2d");ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const padL=44,padR=12,padT=12,padB=22,n=curve.d.length;if(n<2)return;
+  let lo=1e9,hi=-1e9;lines.forEach(l=>curve[l.k].forEach(v=>{if(v>0){lo=Math.min(lo,v);hi=Math.max(hi,v);}}));
+  const L=Math.log(lo*0.95),Hh=Math.log(hi*1.05);
+  const X=i=>padL+i/(n-1)*(W-padL-padR),Y=v=>padT+(1-(Math.log(v)-L)/(Hh-L))*(H-padT-padB);
+  ctx.font="9.5px ui-monospace,Consolas,monospace";ctx.textAlign="right";ctx.textBaseline="middle";
+  const ticks=[50,75,100,150,200,300,500,1000,2000].filter(v=>v>=lo*0.95&&v<=hi*1.05);
+  ticks.forEach(v=>{const y=Y(v);ctx.strokeStyle=gridCol(v===100);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();ctx.fillStyle="#7a828e";ctx.fillText(v,padL-6,y);});
+  ctx.textAlign="center";ctx.textBaseline="top";
+  [0,Math.floor((n-1)/2),n-1].forEach(i=>{const d=curve.d[i]||"";ctx.fillText(MONTHS_TR[parseInt(d.slice(5,7))-1]+" '"+d.slice(2,4),Math.min(Math.max(X(i),padL+20),W-padR-20),H-padB+6);});
+  lines.forEach(l=>{ctx.strokeStyle=l.c;ctx.lineWidth=l.w||1.6;ctx.setLineDash(l.dash||[]);ctx.beginPath();
+    curve[l.k].forEach((v,i)=>{const x=X(i),y=Y(Math.max(v,0.01));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();ctx.setLineDash([]);});
+}
 function yabSleeveHtml(D,fk,X){
-  if(!priceData||!priceData.quotes)return "";
-  const {valid,expo,days,isCmp}=X;
-  const P=yabSleeve.pct,N=yabSleeve.n;
-  const held=new Set(D.rows.map(r=>r.tk));
-  // göreli en güçlü N sektör (kripto hariç); hepsi kıyasın altındaysa yine seçilir ama uyarı verilir
-  const pick=valid.filter(r=>!/kripto/i.test(r.sec.name)).slice(0,N);
-  const allNeg=pick.length&&pick.every(r=>(isCmp?r.rel:r.ret)<0);
+  const P=yabSleeve.pct,N=yabSleeve.n||3,Lw=yabSleeve.L||4,key=sepetKey();
   const ctl=`<span class="fon-sub-lbl">dilim</span> ${yabBtns([["5","%5"],["10","%10"],["15","%15"],["20","%20"]],String(P),"data-slpct")}
-    <span class="fon-sub-lbl">sektör sayısı</span> ${yabBtns([["2","2"],["3","3"],["4","4"],["5","5"]],String(N),"data-sln")}`;
-  const head=`<div class="fon-sec-h">🎯 Rotasyon Sepeti — fonun %${P}'u ${ctl}</div>`;
-  if(!pick.length)return head+`<div class="fon-empty" style="padding:14px">Rotasyon için yeterli veri yok.</div>`;
-  const warn=allNeg?`<div class="tr-hl" style="margin-bottom:10px">⚠️ Bu pencerede seçilen sektörlerin hepsi ${isCmp?"kıyasın altında":"eksi getirili"} — sepet göreli en güçlüleri gösteriyor. Pencereyi ya da kıyası (ör. Evren) değiştirerek karşılaştır.</div>`:"";
-  const per=P/pick.length,sleeveTl=D.tot*P/100;
-  const cards=pick.map((r,i)=>{
-    const nm=r.sec.name,w=expo[nm]||0;
-    const names=r.sec.companies.map(c=>{const t=(c.ticker||"").toUpperCase(),h=histOf(t);return {t,ret:h?winReturn(h.c,days):null};})
-      .filter(x=>x.ret!=null&&!YAB_CRYPTO_BAN.includes(x.t)).sort((a,b)=>b.ret-a.ret).slice(0,4);
-    const chips=names.map(x=>`<span class="rc-tk ${x.ret>=0?"up":"down"}" data-yabtk="${esc(x.t)}" title="${held.has(x.t)?esc(fk)+"'de var":"portföyde yok"}"><span>${esc(x.t)}${held.has(x.t)?" ●":""}</span><span>${x.ret>=0?"+":""}${x.ret.toFixed(1)}%</span></span>`).join("");
-    return `<div class="yab-sl-card"><div class="yab-sl-h"><span class="idx">${i+1}</span><b>${esc(nm)}</b></div>
-      <div class="yab-sl-w"><span>Hedef</span><b>%${per.toFixed(1)}</b><span style="color:var(--muted)">${fmtTL(D.tot*per/100)}</span></div>
-      <div class="yab-sl-w"><span>${isCmp?"Ayrışma":"Getiri"}</span><b class="${(isCmp?r.rel:r.ret)>=0?"up":"down"}">${(isCmp?r.rel:r.ret)>=0?"+":""}${(isCmp?r.rel:r.ret).toFixed(1)}${isCmp?"p":"%"}</b><span style="color:var(--muted)">mevcut %${w.toFixed(1)}</span></div>
-      <div class="rc-tks" style="margin-top:8px">${chips||'<span class="fon-sub-lbl">fiyat verisi yok</span>'}</div></div>`;
-  }).join("");
-  return head+warn+`<div class="fon-sub-lbl" style="margin:-4px 0 10px">Dilim büyüklüğü <b>${fmtTL(sleeveTl)}</b> · seçili rotasyon penceresinde (${esc((YAB_ROT_WIN.find(x=>x[0]===yabRotWin)||YAB_ROT_WIN[0])[1])}) ${isCmp?"kıyasa göre en güçlü ayrışan":"en yüksek getirili"} ${pick.length} sektöre eşit ağırlık · her sektörde pencerenin en güçlü 4 hissesi (● = ${esc(fk)}'de var)</div>
-    <div class="yab-sl-grid">${cards}</div>
-    <div class="fon-sub-lbl" style="margin-top:8px">Öneri amaçlıdır; "mevcut" = ${esc(fk)}'nin o sektördeki bugünkü yabancı ağırlığı. Kripto sektörü ve kripto bağlantılı paylar (${YAB_CRYPTO_BAN.join(", ")}) izahname gereği hariç. Tema dışı sektörler (ör. nükleer, nadir metal) izahnamede fonun en fazla %20'si ile sınırlı.</div>`;
+    <span class="fon-sub-lbl">sinyal</span> ${yabBtns(SEPET_L,String(Lw),"data-sll")}
+    <span class="fon-sub-lbl">sektör</span> ${yabBtns([["2","2"],["3","3"],["4","4"]],String(N),"data-sln")}`;
+  const head=`<div class="fon-sec-h">🎯 Haftalık Rotasyon Sepeti — fonun %${P}'u ${ctl}</div>`;
+  const V=sepetData&&sepetData.variants&&sepetData.variants[key];
+  if(!V)return head+`<div class="fon-empty" style="padding:14px">Haftalık sepet verisi henüz yok — <code>rotasyon-sepet.py</code> her Cumartesi sabahı (Cuma kapanışından sonra) üretir.</div>`;
+  const held=new Set(D.rows.map(r=>r.tk)),cur=V.current,per=P/Math.max(1,cur.picks.length),sleeveTl=D.tot*P/100;
+  const spyQ=quoteOf("SPY"),spyH=histOf("SPY");let spyPx=null;
+  if(spyH){const i=spyH.d.indexOf(cur.asOf);if(i>=0)spyPx=spyH.c[i];}
+  const spyLive=spyPx?sepetLive("SPY",spyPx):null;
+  const lv=v=>v==null?`<span style="color:var(--faint)">—</span>`:yabPct(v);
+  // bu haftanın kartları
+  const etfL=[],stkL=[];
+  const cards=cur.picks.map((p,i)=>{
+    const eL=p.etf?sepetLive(p.etf,p.etfPx):null;
+    const sL=sepetAvg(p.stocks.map(x=>sepetLive(x.t,x.px)));
+    etfL.push(eL!=null?eL:sL);stkL.push(sL);
+    const stocks=p.stocks.map(x=>{const l=sepetLive(x.t,x.px);
+      return `<span class="rc-tk ${l==null?"flat":(l>=0?"up":"down")}" data-yabtk="${esc(x.t)}" title="${esc(x.t)} · ${Lw===1?"1 hafta":Lw===4?"1 ay":"3 ay"} momentum %${x.mom} · Cuma ${x.px}${held.has(x.t)?" · "+esc(fk)+"'de var":""}"><span>${esc(x.t)}${held.has(x.t)?" ●":""}</span><span>${l==null?"–":(l>=0?"+":"")+l.toFixed(1)+"%"}</span></span>`;}).join("");
+    return `<div class="yab-sl-card"><div class="yab-sl-h"><span class="idx">${i+1}</span><b>${esc(p.sector)}</b></div>
+      <div class="yab-sl-w"><span>Hedef</span><b>%${per.toFixed(1)}</b><span style="color:var(--muted)">${fmtTL(D.tot*per/100)} · mevcut %${(X.expo[p.sector]||0).toFixed(1)}</span></div>
+      <div class="yab-sl-w"><span>Sinyal</span><b class="${p.score>=0?"up":"down"}">${p.score>=0?"+":""}${p.score.toFixed(1)}%</b><span style="color:var(--muted)">${p.rel!=null?`SPY'a göre ${p.rel>=0?"+":""}${p.rel.toFixed(1)}p`:""}</span></div>
+      <div class="yab-sl-etf">${p.etf?`<span class="fon-chip" data-yabtk="${esc(p.etf)}" style="cursor:pointer"><span class="fc-tk">${esc(p.etf)}</span> ETF</span> <span class="fon-sub-lbl">sinyal ${p.etfMom!=null?(p.etfMom>=0?"+":"")+p.etfMom.toFixed(1)+"%":"—"} · bu hafta</span> ${lv(eL)}`:`<span class="fon-sub-lbl">Temiz ETF karşılığı yok → hisse sepeti</span>`}</div>
+      <div class="fon-sub-lbl" style="margin:8px 0 4px">Hisse önerisi · bu hafta</div><div class="rc-tks">${stocks}</div></div>`;}).join("");
+  const wkE=sepetAvg(etfL),wkS=sepetAvg(stkL);
+  let html=head+`<div class="fon-sub-lbl" style="margin:-4px 0 10px">Seçim: <b>Cuma ${fmtDM(cur.asOf)} kapanışı</b> · sinyal = sektördeki takip hisselerinin son ${Lw===1?"1 hafta":Lw===4?"1 ay":"3 ay"} getirisi (eşit ağırlık) · en güçlü ${N} sektöre eşit ağırlık · dilim ${fmtTL(sleeveTl)} · her Cumartesi sabahı yenilenir ve kaydedilir</div>
+    <div class="yab-wk"><div><span>Bu hafta · ETF sepeti</span><b>${lv(wkE)}</b></div><div><span>Bu hafta · Hisse sepeti</span><b>${lv(wkS)}</b></div><div><span>SPY</span><b>${lv(spyLive)}</b></div>
+      <div><span>ETF − SPY</span><b>${wkE!=null&&spyLive!=null?yabPct(wkE-spyLive):"—"}</b></div><div class="fon-sub-lbl" style="align-self:center">Cuma ${fmtDM(cur.asOf)} kapanışından bugüne (Prizma fiyat verisi)</div></div>
+    <div class="yab-sl-grid">${cards}</div>`;
+  // canlı kayıt (dondurulmuş haftalar)
+  const log=((sepetData.live||{})[key]||[]).filter(e=>e.done).slice().reverse();
+  html+=`<div class="fon-sec-h">📒 Canlı Kayıt — her Cuma dondurulan sepetin hafta sonu performansı</div>`;
+  if(!log.length){
+    html+=`<div class="fon-sub-lbl" style="margin-bottom:6px">İlk kayıt Cuma ${fmtDM(cur.asOf)} sepeti; ilk sonuç bir sonraki Cuma kapanışından sonra (Cumartesi sabahı) burada görünür.</div>`;
+  }else{
+    let cE=1,cS=1,cP=1;log.slice().reverse().forEach(e=>{cE*=1+(e.etf||0)/100;cS*=1+(e.stock||0)/100;cP*=1+(e.spy||0)/100;});
+    html+=`<div class="yab-wk"><div><span>Toplam · ETF</span><b>${yabPct((cE-1)*100)}</b></div><div><span>Toplam · Hisse</span><b>${yabPct((cS-1)*100)}</b></div><div><span>Toplam · SPY</span><b>${yabPct((cP-1)*100)}</b></div><div><span>Hafta</span><b>${log.length}</b></div></div>
+      <div style="overflow-x:auto"><table class="fon-tbl"><thead><tr><th>Hafta</th><th>Sektörler</th><th class="r">ETF</th><th class="r">Hisse</th><th class="r">SPY</th><th class="r">ETF − SPY</th></tr></thead><tbody>${
+      log.map(e=>`<tr><td style="white-space:nowrap;font-family:var(--mono)">${fmtDM(e.d)} → ${fmtDM(e.end)}</td><td>${e.picks.map(p=>`<span class="fon-chip"><span class="fc-tk">${esc(p.etf||"—")}</span> ${esc(shortSec(p.sector))}</span>`).join("")}</td>
+        <td class="r">${yabPct(e.etf)}</td><td class="r">${yabPct(e.stock)}</td><td class="r">${yabPct(e.spy)}</td><td class="r">${e.etf!=null&&e.spy!=null?yabPct(e.etf-e.spy):"—"}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+  // backtest
+  const st=V.stats,rows=[["etf","ETF rotasyonu","#6FA2CE"],["stock","Hisse rotasyonu","#E9A53C"],["etfAll","Tüm sektör ETF'leri (eşit ağ.)","#9FB87A"],["uni","Takip evreni (eşit ağ.)","#8B93A0"],["spy","SPY","#C77FA0"],["qqq","QQQ","#7E8AA0"]];
+  const sc=v=>v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"%";
+  html+=`<div class="fon-sec-h">🧪 Geriye Dönük Test — ${esc(key.replace("L","sinyal ").replace("N"," hf · ")+" sektör")} <span class="fon-sub-lbl">· ${st.etf?st.etf.weeks:0} hafta · haftalık yeniden dengeleme</span></div>
+    <div style="overflow-x:auto"><table class="fon-tbl"><thead><tr><th>Strateji</th><th class="r">Kümülatif</th><th class="r">Yıllık</th><th class="r">Oynaklık</th><th class="r">Sharpe</th><th class="r">Maks. düşüş</th><th class="r">SPY'ı geçtiği hafta</th></tr></thead><tbody>${
+    rows.map(([k,n,c])=>{const x=st[k];if(!x)return "";const hit=k==="etf"?st.hitEtf:(k==="stock"?st.hitStock:null);
+      return `<tr><td><span style="display:inline-block;width:10px;height:3px;background:${c};vertical-align:middle;margin-right:7px;border-radius:2px"></span>${n}</td><td class="r">${sc(x.cum)}</td><td class="r"><b>${sc(x.ann)}</b></td><td class="r">%${x.vol}</td><td class="r">${x.sharpe}</td><td class="r"><span class="down">${x.maxDD}%</span></td><td class="r">${hit!=null?"%"+hit:"—"}</td></tr>`;}).join("")}</tbody></table></div>
+    <canvas id="sepetCurve" style="display:block;width:100%;margin-top:10px;border:1px solid var(--line-cool);border-radius:10px"></canvas>
+    <div class="fon-sub-lbl" style="margin-top:4px">100'den başlayan kümülatif değer (log ölçek) · mavi = ETF rotasyonu · turuncu = hisse rotasyonu · yeşil kesikli = tüm sektör ETF'leri · pembe = SPY</div>`;
+  // varyant karşılaştırma ızgarası
+  const vs=sepetData.variants,Ls=sepetData.lookbacks||[1,4,12],Ns=sepetData.ns||[2,3,4];
+  html+=`<div class="fon-sec-h" style="margin-top:16px">Ayar karşılaştırması <span class="fon-sub-lbl">· yıllık getiri ETF / hisse · tıkla → seç</span></div>
+    <table class="fon-tbl" style="max-width:640px"><thead><tr><th>Sinyal \\ Sektör</th>${Ns.map(n=>`<th class="r">${n} sektör</th>`).join("")}</tr></thead><tbody>${
+    Ls.map(l=>`<tr><td>${l===1?"1 hafta":l===4?"1 ay":"3 ay"}</td>${Ns.map(n=>{const v=vs["L"+l+"N"+n];if(!v)return "<td></td>";const on=("L"+l+"N"+n)===key;
+      return `<td class="r" data-slv="${l},${n}" style="cursor:pointer;${on?"background:rgba(233,165,60,.12);":""}">${sc(v.stats.etf&&v.stats.etf.ann)} <span style="color:var(--faint)">/ ${sc(v.stats.stock&&v.stats.stock.ann)}</span></td>`;}).join("")}</tr>`).join("")}</tbody></table>
+    <div class="fon-sub-lbl" style="margin-top:4px">Kıyas: tüm sektör ETF'leri eşit ağırlık ${sc(V.stats.etfAll&&V.stats.etfAll.ann)} · SPY ${sc(V.stats.spy&&V.stats.spy.ann)} yıllık.</div>`;
+  // son haftaların backtest seçimleri
+  const wk=(V.weeks||[]).slice(-8).reverse();
+  html+=`<details style="margin-top:12px"><summary class="fon-sub-lbl" style="cursor:pointer">Backtest — son 8 haftanın seçimleri</summary>
+    <table class="fon-tbl" style="margin-top:6px"><thead><tr><th>Cuma</th><th>Seçilen sektörler</th><th class="r">ETF</th><th class="r">Hisse</th><th class="r">SPY</th></tr></thead><tbody>${
+    wk.map(w=>`<tr><td style="font-family:var(--mono)">${fmtDM(w.d)}</td><td>${w.picks.map(x=>esc(shortSec(x))).join(" · ")}</td><td class="r">${yabPct(w.etf)}</td><td class="r">${yabPct(w.stock)}</td><td class="r">${yabPct(w.spy)}</td></tr>`).join("")}</tbody></table></details>`;
+  html+=`<div class="yab-caveat">⚠️ <b>Backtest nasıl okunmalı:</b> Test bugünkü takip listesiyle yapıldı. Liste geriye dönük seçildiği için (bugün güçlü olan temalar) hisse rotasyonu ve evren rakamları <b>olduğundan iyimser</b>. Rotasyonun gerçek katkısını görmek için ETF rotasyonunu "tüm sektör ETF'leri" satırıyla kıyasla. Asıl ölçü <b>Canlı Kayıt</b>: her Cuma dondurulan sepetin sonraki haftası. Kripto sektörü ve ${(sepetData.excluded&&sepetData.excluded.tickers||[]).join(", ")} izahname gereği hariç. Getiriler USD, temettü düzeltmeli; işlem maliyeti dahil değil.</div>`;
+  return html;
 }
 function renderFonYabanci(body,fk){
   const D=yabData(fk);
@@ -3192,6 +3269,10 @@ function renderFonYabanci(body,fk){
   body.querySelectorAll("[data-yabrb]").forEach(b=>b.onclick=()=>{yabRotBase=b.dataset.yabrb;renderFon();});
   body.querySelectorAll("[data-slpct]").forEach(b=>b.onclick=()=>{yabSleeve.pct=+b.dataset.slpct;saveYabSleeve();renderFon();});
   body.querySelectorAll("[data-sln]").forEach(b=>b.onclick=()=>{yabSleeve.n=+b.dataset.sln;saveYabSleeve();renderFon();});
+  body.querySelectorAll("[data-sll]").forEach(b=>b.onclick=()=>{yabSleeve.L=+b.dataset.sll;saveYabSleeve();renderFon();});
+  body.querySelectorAll("[data-slv]").forEach(b=>b.onclick=()=>{const [l,n]=b.dataset.slv.split(",");yabSleeve.L=+l;yabSleeve.n=+n;saveYabSleeve();renderFon();});
+  const sc=document.getElementById("sepetCurve"),SV=sepetData&&sepetData.variants&&sepetData.variants[sepetKey()];
+  if(sc&&SV&&SV.curve)drawSepetCurve(sc,SV.curve,[{k:"etfAll",c:"#9FB87A",dash:[5,4],w:1.3},{k:"spy",c:"#C77FA0",w:1.4},{k:"stock",c:"#E9A53C",w:1.4},{k:"etf",c:"#6FA2CE",w:2.2}]);
   body.querySelectorAll("[data-yabtk]").forEach(el=>el.onclick=()=>{const t=el.dataset.yabtk;if(!histOf(t)){flash(t+" için grafik verisi yok");return;}
     document.getElementById("chartModal").style.zIndex="95";openChart(t);});
 }
@@ -4086,7 +4167,7 @@ async function init(){
   state=loadLocal();              // önce yereldeki son kopyayı göster (anında)
   render(true);
   if(!IN_FRAME && ghReady()){
-    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();await ghLoadShort();await ghLoadOption();startGitPoll();render(true);}
+    try{await ghLoadData();await ghLoadPrice();await ghLoadNews();await ghLoadRegime();await ghLoadRegimeChart();await ghLoadFon();await ghLoadTarama();await ghLoadAkis();await ghLoadTRRapor();await ghLoadTRHisse();await ghLoadShort();await ghLoadOption();await ghLoadSepet();startGitPoll();render(true);}
     catch(e){flash("GitHub bağlantı hatası: "+e.message);}
   }
 }
