@@ -502,6 +502,11 @@
   .yab-st.opp{color:var(--accent);border-color:var(--line);background:rgba(233,165,60,.08)}
   .yab-st.neg{color:var(--bad);border-color:rgba(210,101,78,.45)}
   .fon-tbl tr.yab-held td:first-child{box-shadow:inset 3px 0 0 var(--accent-2)}
+  .yab-sl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+  .yab-sl-card{background:var(--surface);border:1px solid var(--line-cool);border-radius:12px;padding:12px 14px}
+  .yab-sl-h{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
+  .yab-sl-w{display:flex;align-items:baseline;gap:8px;font-family:var(--mono);font-size:12px;padding:2px 0}
+  .yab-sl-w span:first-child{color:var(--faint);width:62px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
   /* haftalık sektör bülteni (rotasyon) */
   .tr-hls{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
   .tr-hl{font-size:12.5px;line-height:1.5}
@@ -3036,44 +3041,106 @@ function yabSectors(D,fk,w){
 function yabPct(v,d){if(v==null)return `<span style="color:var(--faint)">—</span>`;d=d==null?1:d;return `<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${v.toFixed(d)}%</span>`;}
 function yabPts(v){return `<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${v.toFixed(2)}p</span>`;}
 function yabBtns(list,cur,attr){return `<span class="fon-retmode" style="margin-left:0">${list.map(x=>`<button class="rmbtn ${cur===x[0]?"on":""}" ${attr}="${x[0]}">${x[1]}</button>`).join("")}</span>`;}
-// Sektör rotasyonu (ana sayfadaki hesap) × fonun yabancı maruziyeti
-function yabRotHtml(D){
-  if(!priceData||!priceData.quotes)return `<div class="fon-empty" style="padding:14px">Rotasyon için piyasa verisi gerekli — GitHub'a bağlan.</div>`;
+// İzahname sınırları (KAP, BV Portföy Teknoloji Değişken Fon izahnamesi, md. 2.2)
+const FON_LIMITS={BVV:{yabTema:[40,70],yabToplam:80,temaDisi:20,
+  src:"BVV izahnamesi md. 2.2 — temaya uygun yabancı ortaklık payı/ÖSBA/yabancı BYF %40–70 · yabancı para ve araçlar toplamı %80'in altında · tema dışı ortaklık payları ≤%20 · kripto işlem platformu payları alınamaz"}};
+const YAB_CRYPTO_BAN=["COIN","HOOD","MSTR"];   // izahname: kripto varlık / işlem platformu bağlantılı paylar dahil edilemez
+let yabSleeve={pct:10,n:3};
+try{const v=JSON.parse(localStorage.getItem("sm-yab-sleeve")||"null");if(v&&v.pct&&v.n)yabSleeve=v;}catch(e){}
+function saveYabSleeve(){try{localStorage.setItem("sm-yab-sleeve",JSON.stringify(yabSleeve));}catch(e){}}
+const YAB_LOW=1.0;   // fonun %1'inin altı = "ağırlık düşük"
+function yabRotCtx(D,fk){
   const days=(YAB_ROT_WIN.find(x=>x[0]===yabRotWin)||YAB_ROT_WIN[0])[2];
   const R=sectorRotation(days,yabRotBase);
-  const expo={};D.rows.forEach(r=>{const s=yabSecOf(r);expo[s]=(expo[s]||0)+r.wF;});
+  const expo={},contrib={},cnt={};
+  D.rows.forEach(r=>{const s=yabSecOf(r);expo[s]=(expo[s]||0)+r.wF;cnt[s]=(cnt[s]||0)+1;
+    const v=yabRet(r.h,fk,yabRotWin);if(v!=null)contrib[s]=(contrib[s]||0)+r.wF*v/100;});
   const thr=days===1?0.5:(days===5?1:2);   // "belirgin ayrışma" eşiği (puan)
   const valid=R.rows.filter(r=>r.ret!=null).sort((a,b)=>b.rel-a.rel);
+  return {days,R,expo,contrib,cnt,thr,valid,isCmp:yabRotBase!=="mutlak"};
+}
+// İzahname uyum kartı
+function yabLimitsHtml(D,fk){
+  const L=FON_LIMITS[fk];if(!L)return "";
+  const tema=D.invPct,top=D.invPct+D.cashPct;
+  const st=(v,lo,hi)=>v<lo?["neg",`asgari %${lo}'ın altında`]:(v>hi?["neg",`azami %${hi}'ın üstünde`]:(v<lo+2||v>hi-2?["opp","sınıra yakın"]:["pos","limit içinde"]));
+  const [c1,t1]=st(tema,L.yabTema[0],L.yabTema[1]);
+  const [c2,t2]=top>=L.yabToplam?["neg",`%${L.yabToplam} sınırında/üstünde`]:(top>=L.yabToplam-5?["opp","sınıra yakın"]:["pos","limit içinde"]);
+  const room=L.yabTema[1]-tema,need=L.yabTema[0]-tema;
+  return `<div class="fon-sec-h">📜 İzahname Sınırları — ${esc(fk)}</div>
+    <table class="fon-tbl"><thead><tr><th>Kalem</th><th class="r">Mevcut</th><th class="r">Sınır</th><th>Durum</th><th class="r">Pay</th></tr></thead><tbody>
+    <tr><td>Yabancı hisse + yabancı BYF (temaya uygun)</td><td class="r"><b>%${tema.toFixed(1)}</b></td><td class="r">%${L.yabTema[0]} – %${L.yabTema[1]}</td><td><span class="yab-st ${c1}">${t1}</span></td>
+      <td class="r">${need>0?`<span class="down">+%${need.toFixed(1)} eksik · ${fmtTL(D.tot*need/100)}</span>`:`<span style="color:var(--muted)">%${room.toFixed(1)} boşluk · ${fmtTL(D.tot*room/100)}</span>`}</td></tr>
+    <tr><td>Yabancı para ve yabancı araçlar toplamı (döviz nakit dahil)</td><td class="r"><b>%${top.toFixed(1)}</b></td><td class="r">&lt; %${L.yabToplam}</td><td><span class="yab-st ${c2}">${t2}</span></td>
+      <td class="r"><span style="color:var(--muted)">%${(L.yabToplam-top).toFixed(1)} boşluk</span></td></tr>
+    </tbody></table>
+    <div class="fon-sub-lbl" style="margin-top:6px">${esc(L.src)}. Hesap yaklaşık: tüm yabancı hisse/ETF'ler temaya uygun sayıldı; kesin uyum için SPK uyum kontrol tablosu esas alınmalı.</div>`;
+}
+// Sektör rotasyonu (ana sayfadaki hesap) × fonun yabancı maruziyeti ve katkısı
+function yabRotHtml(D,fk,X){
+  if(!priceData||!priceData.quotes)return `<div class="fon-empty" style="padding:14px">Rotasyon için piyasa verisi gerekli — GitHub'a bağlan.</div>`;
+  const {R,expo,contrib,cnt,thr,valid,isCmp}=X;
   if(!valid.length)return `<div class="fon-empty" style="padding:14px">Rotasyon için fiyat geçmişi yok.</div>`;
-  const isCmp=yabRotBase!=="mutlak";
   const baseName=R.baseMissing?"evren ort.":(yabRotBase==="evren"?"evren ort.":yabRotBase);
   const status=(rel,w)=>{
     if(!isCmp)return ["dim",""];
-    if(rel>=thr)return w>0?["pos","🟢 Pozitif ayrışma · taşıyoruz"]:["opp","⭐ Pozitif ayrışma · portföyde yok"];
+    if(rel>=thr)return w>=YAB_LOW?["pos","🟢 Pozitif ayrışma · taşıyoruz"]:(w>0?["opp",`⭐ Pozitif ayrışma · ağırlık düşük`]:["opp","⭐ Pozitif ayrışma · portföyde yok"]);
     if(rel<=-thr)return w>0?["neg","🔴 Negatif ayrışma · maruziyet var"]:["dim","Negatif ayrışma · portföyde yok"];
     return ["dim","Nötr"];
   };
-  const opp=valid.filter(r=>isCmp&&r.rel>=thr&&!(expo[r.sec.name]>0));
+  const opp=valid.filter(r=>isCmp&&r.rel>=thr&&(expo[r.sec.name]||0)<YAB_LOW);
   const risk=valid.filter(r=>isCmp&&r.rel<=-thr&&expo[r.sec.name]>0);
-  const chip=r=>`<span class="fon-chip"><span class="fc-tk">${esc(shortSec(r.sec.name))}</span> ${r.rel>=0?"+":""}${r.rel.toFixed(1)}p</span>`;
+  const chip=(r,extra)=>`<span class="fon-chip"><span class="fc-tk">${esc(shortSec(r.sec.name))}</span> ${r.rel>=0?"+":""}${r.rel.toFixed(1)}p${extra||""}</span>`;
   let hl="";
-  if(opp.length)hl+=`<div class="tr-hl">⭐ <b>Pozitif ayrışıyor, ${esc(fonFund)}'de yok:</b> ${opp.map(chip).join("")}</div>`;
-  if(risk.length)hl+=`<div class="tr-hl">🔴 <b>Negatif ayrışıyor, ${esc(fonFund)}'de var:</b> ${risk.map(r=>chip(r)+`<span class="fon-sub-lbl">%${expo[r.sec.name].toFixed(1)} fon</span>`).join(" ")}</div>`;
+  if(opp.length)hl+=`<div class="tr-hl">⭐ <b>Pozitif ayrışıyor, ${esc(fk)}'de yok ya da ağırlığı düşük:</b> ${opp.map(r=>chip(r,(expo[r.sec.name]?` · <span style="color:var(--muted)">%${expo[r.sec.name].toFixed(1)} fon</span>`:""))).join("")}</div>`;
+  if(risk.length)hl+=`<div class="tr-hl">🔴 <b>Negatif ayrışıyor, ${esc(fk)}'de var:</b> ${risk.map(r=>chip(r,` · <span style="color:var(--muted)">%${expo[r.sec.name].toFixed(1)} fon</span>`)).join("")}</div>`;
   if(isCmp&&!hl)hl=`<div class="fon-sub-lbl">Bu pencerede ±${thr} puanı aşan belirgin bir ayrışma yok.</div>`;
   const maxAbs=Math.max(0.01,...valid.map(r=>Math.abs(r.rel)));
+  const winLbl=(YAB_ROT_WIN.find(x=>x[0]===yabRotWin)||YAB_ROT_WIN[0])[1];
   const rows=valid.map(r=>{
-    const w=expo[r.sec.name]||0,[sc,st]=status(r.rel,w),pos=r.rel>=0,bw=Math.abs(r.rel)/maxAbs*50;
-    const bar=`<div class="rot-track" style="min-width:140px"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${pos?`left:50%;width:${bw}%`:`left:${50-bw}%;width:${bw}%`}"></div></div>`;
-    return `<tr class="${w>0?"yab-held":""}"><td>${esc(r.sec.name)}</td><td>${bar}</td>
+    const nm=r.sec.name,w=expo[nm]||0,c=contrib[nm],[sc,st]=status(r.rel,w),pos=r.rel>=0,bw=Math.abs(r.rel)/maxAbs*50;
+    const bar=`<div class="rot-track" style="min-width:120px"><div class="rot-mid"></div><div class="rot-bar ${pos?"pos":"neg"}" style="${pos?`left:50%;width:${bw}%`:`left:${50-bw}%;width:${bw}%`}"></div></div>`;
+    const wCell=w>0?`<b>%${w.toFixed(1)}</b> <span style="color:var(--faint)">· ${fmtTL(D.tot*w/100)} · ${cnt[nm]}h</span>`:`<span style="color:var(--faint)">—</span>`;
+    return `<tr class="${w>0?"yab-held":""}"><td>${esc(nm)}${YAB_CRYPTO_BAN.length&&/kripto/i.test(nm)?` <span class="yab-st neg" title="İzahname: kripto işlem platformu payları alınamaz (COIN, HOOD, MSTR hariç tutulur)">⚠ izahname</span>`:""}</td><td>${bar}</td>
       <td class="r">${yabPct(r.ret)}</td>${isCmp?`<td class="r"><b class="${pos?"up":"down"}">${pos?"+":""}${r.rel.toFixed(1)}</b></td>`:""}
       <td class="r" style="color:var(--faint)">${r.n}h·${r.breadth}%↑</td>
-      <td class="r">${w>0?`%${w.toFixed(1)}`:`<span style="color:var(--faint)">—</span>`}</td>
+      <td class="r" style="white-space:nowrap">${wCell}</td>
+      <td class="r">${c!=null&&w>0?yabPts(c):`<span style="color:var(--faint)">—</span>`}</td>
       <td>${st?`<span class="yab-st ${sc}">${st}</span>`:""}</td></tr>`;
   }).join("");
   const miss=R.baseMissing?`<div class="fon-sub-lbl">${esc(yabRotBase)} verisi yok — evren ortalamasına göre gösteriliyor.</div>`:"";
   return `<div class="yab-hls">${hl}</div>${miss}
-    <table class="fon-tbl"><thead><tr><th>Sektör</th><th>${isCmp?"Ayrışma":"Getiri"}</th><th class="r">Getiri</th>${isCmp?`<th class="r">vs ${esc(baseName)}</th>`:""}<th class="r">hisse·↑</th><th class="r">${esc(fonFund)} yab. ağ.</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="fon-sub-lbl" style="margin-top:8px">Ana sayfadaki Sektör Rotasyonu ile aynı hesap: takip listendeki hisselerin eşit ağırlıklı getirisi. Sol çizgili satırlar = ${esc(fonFund)}'nin yabancı kısmında pozisyon olan sektörler. Ağırlık = fon içindeki %.</div>`;
+    <div style="overflow-x:auto"><table class="fon-tbl"><thead><tr><th>Sektör</th><th>${isCmp?"Ayrışma":"Getiri"}</th><th class="r">Getiri</th>${isCmp?`<th class="r">vs ${esc(baseName)}</th>`:""}<th class="r">hisse·↑</th><th class="r">${esc(fk)}'de bulunma</th><th class="r">${esc(fk)} katkı (${esc(winLbl)})</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="fon-sub-lbl" style="margin-top:8px">Getiri/ayrışma = ana sayfadaki Sektör Rotasyonu (takip listesinin eşit ağırlıklı getirisi). Bulunma = ${esc(fk)}'nin o sektördeki yabancı pozisyonlarının fon içindeki payı · TL · hisse sayısı. Katkı = ${esc(fk)}'nin o sektördeki pozisyonlarının seçili pencerede fona kazandırdığı puan. "Ağırlık düşük" = fonun %${YAB_LOW}'inin altı.</div>`;
+}
+// Fonun bir dilimini (varsayılan %10) rotasyonun öncü sektörlerine dağıtan sepet önerisi
+function yabSleeveHtml(D,fk,X){
+  if(!priceData||!priceData.quotes)return "";
+  const {valid,expo,days,isCmp}=X;
+  const P=yabSleeve.pct,N=yabSleeve.n;
+  const held=new Set(D.rows.map(r=>r.tk));
+  // göreli en güçlü N sektör (kripto hariç); hepsi kıyasın altındaysa yine seçilir ama uyarı verilir
+  const pick=valid.filter(r=>!/kripto/i.test(r.sec.name)).slice(0,N);
+  const allNeg=pick.length&&pick.every(r=>(isCmp?r.rel:r.ret)<0);
+  const ctl=`<span class="fon-sub-lbl">dilim</span> ${yabBtns([["5","%5"],["10","%10"],["15","%15"],["20","%20"]],String(P),"data-slpct")}
+    <span class="fon-sub-lbl">sektör sayısı</span> ${yabBtns([["2","2"],["3","3"],["4","4"],["5","5"]],String(N),"data-sln")}`;
+  const head=`<div class="fon-sec-h">🎯 Rotasyon Sepeti — fonun %${P}'u ${ctl}</div>`;
+  if(!pick.length)return head+`<div class="fon-empty" style="padding:14px">Rotasyon için yeterli veri yok.</div>`;
+  const warn=allNeg?`<div class="tr-hl" style="margin-bottom:10px">⚠️ Bu pencerede seçilen sektörlerin hepsi ${isCmp?"kıyasın altında":"eksi getirili"} — sepet göreli en güçlüleri gösteriyor. Pencereyi ya da kıyası (ör. Evren) değiştirerek karşılaştır.</div>`:"";
+  const per=P/pick.length,sleeveTl=D.tot*P/100;
+  const cards=pick.map((r,i)=>{
+    const nm=r.sec.name,w=expo[nm]||0;
+    const names=r.sec.companies.map(c=>{const t=(c.ticker||"").toUpperCase(),h=histOf(t);return {t,ret:h?winReturn(h.c,days):null};})
+      .filter(x=>x.ret!=null&&!YAB_CRYPTO_BAN.includes(x.t)).sort((a,b)=>b.ret-a.ret).slice(0,4);
+    const chips=names.map(x=>`<span class="rc-tk ${x.ret>=0?"up":"down"}" data-yabtk="${esc(x.t)}" title="${held.has(x.t)?esc(fk)+"'de var":"portföyde yok"}"><span>${esc(x.t)}${held.has(x.t)?" ●":""}</span><span>${x.ret>=0?"+":""}${x.ret.toFixed(1)}%</span></span>`).join("");
+    return `<div class="yab-sl-card"><div class="yab-sl-h"><span class="idx">${i+1}</span><b>${esc(nm)}</b></div>
+      <div class="yab-sl-w"><span>Hedef</span><b>%${per.toFixed(1)}</b><span style="color:var(--muted)">${fmtTL(D.tot*per/100)}</span></div>
+      <div class="yab-sl-w"><span>${isCmp?"Ayrışma":"Getiri"}</span><b class="${(isCmp?r.rel:r.ret)>=0?"up":"down"}">${(isCmp?r.rel:r.ret)>=0?"+":""}${(isCmp?r.rel:r.ret).toFixed(1)}${isCmp?"p":"%"}</b><span style="color:var(--muted)">mevcut %${w.toFixed(1)}</span></div>
+      <div class="rc-tks" style="margin-top:8px">${chips||'<span class="fon-sub-lbl">fiyat verisi yok</span>'}</div></div>`;
+  }).join("");
+  return head+warn+`<div class="fon-sub-lbl" style="margin:-4px 0 10px">Dilim büyüklüğü <b>${fmtTL(sleeveTl)}</b> · seçili rotasyon penceresinde (${esc((YAB_ROT_WIN.find(x=>x[0]===yabRotWin)||YAB_ROT_WIN[0])[1])}) ${isCmp?"kıyasa göre en güçlü ayrışan":"en yüksek getirili"} ${pick.length} sektöre eşit ağırlık · her sektörde pencerenin en güçlü 4 hissesi (● = ${esc(fk)}'de var)</div>
+    <div class="yab-sl-grid">${cards}</div>
+    <div class="fon-sub-lbl" style="margin-top:8px">Öneri amaçlıdır; "mevcut" = ${esc(fk)}'nin o sektördeki bugünkü yabancı ağırlığı. Kripto sektörü ve kripto bağlantılı paylar (${YAB_CRYPTO_BAN.join(", ")}) izahname gereği hariç. Tema dışı sektörler (ör. nükleer, nadir metal) izahnamede fonun en fazla %20'si ile sınırlı.</div>`;
 }
 function renderFonYabanci(body,fk){
   const D=yabData(fk);
@@ -3105,7 +3172,10 @@ function renderFonYabanci(body,fk){
   }).join("")+`</div>`;
   // --- sektör rotasyonu × maruziyet ---
   html+=`<div class="fon-sec-h">🔄 Sektör Rotasyonu × ${esc(fk)} ${yabBtns(YAB_ROT_WIN,yabRotWin,"data-yabrw")} <span class="fon-sub-lbl">kıyas</span> ${yabBtns(YAB_ROT_BASE,yabRotBase,"data-yabrb")}</div>`;
-  html+=yabRotHtml(D);
+  const X=yabRotCtx(D,fk);
+  html+=yabRotHtml(D,fk,X);
+  html+=yabSleeveHtml(D,fk,X);
+  html+=yabLimitsHtml(D,fk);
   // --- pozisyonlar ---
   const rows=D.rows.map(r=>{const c=yabRet(r.h,fk,yabWin);
     return `<tr><td><span class="ft-tk ${quoteOf(r.tk)&&histOf(r.tk)?"link":"untracked"}" data-yabtk="${esc(r.tk)}">${esc(r.tk)}</span>${r.etf?`<span class="fon-mkt">ETF</span>`:""}</td>
@@ -3120,6 +3190,8 @@ function renderFonYabanci(body,fk){
   body.querySelectorAll("[data-yabwin]").forEach(b=>b.onclick=()=>{yabWin=b.dataset.yabwin;renderFon();});
   body.querySelectorAll("[data-yabrw]").forEach(b=>b.onclick=()=>{yabRotWin=b.dataset.yabrw;renderFon();});
   body.querySelectorAll("[data-yabrb]").forEach(b=>b.onclick=()=>{yabRotBase=b.dataset.yabrb;renderFon();});
+  body.querySelectorAll("[data-slpct]").forEach(b=>b.onclick=()=>{yabSleeve.pct=+b.dataset.slpct;saveYabSleeve();renderFon();});
+  body.querySelectorAll("[data-sln]").forEach(b=>b.onclick=()=>{yabSleeve.n=+b.dataset.sln;saveYabSleeve();renderFon();});
   body.querySelectorAll("[data-yabtk]").forEach(el=>el.onclick=()=>{const t=el.dataset.yabtk;if(!histOf(t)){flash(t+" için grafik verisi yok");return;}
     document.getElementById("chartModal").style.zIndex="95";openChart(t);});
 }
